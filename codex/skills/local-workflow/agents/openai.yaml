@@ -1,0 +1,4 @@
+interface:
+  display_name: "Local Workflow"
+  short_description: "Delegate substantial work across focused agents"
+  default_prompt: "Use $local-workflow to decompose this substantial task, delegate focused threads, verify any changes, and synthesize the result."

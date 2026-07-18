@@ -11,7 +11,7 @@ description: >-
   the research is implementation-bound, digests facts with citations, and
   writes the result back to the cache for future reuse. NOT for reading this
   repo's own code or project skills — that is code-digester's job.
-model: sonnet
+model: opus
 effort: high
 color: indigo
 disallowedTools: Write, Edit, NotebookEdit

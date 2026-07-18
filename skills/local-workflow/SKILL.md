@@ -89,7 +89,7 @@ The house subagents bake model + effort + read/write boundary into `.claude/agen
 | `subagent_type` | Tier | Boundary | Dispatch it for |
 |-----------------|------|----------|-----------------|
 | **`code-digester`** | sonnet / high | read-only | **Default for most threads** — digest a subsystem/file/skill, audits, second-angle reads. |
-| **`research-specialist`** | sonnet / high | repo read-only + own memory (research cache) | **Sole external-research tier** — ALL external/current-facts threads (library APIs, versions, upgrades, CVEs, vendor docs); cache-first (checks `.claude/agent-memory/research-specialist/` before searching), web search only on a miss, digests captured back to that cache for reuse. |
+| **`research-specialist`** | opus / high | repo read-only + own memory (research cache) | **Sole external-research tier** — ALL external/current-facts threads (library APIs, versions, upgrades, CVEs, vendor docs); cache-first (checks `.claude/agent-memory/research-specialist/` before searching), web search only on a miss, digests captured back to that cache for reuse. |
 | **`deep-analyst`** | opus / high | read-only | Hard reasoning only — cross-file traces, architecture mapping, gnarly multi-file debugging. |
 | **`code-developer`** | sonnet / high | Read/Edit/Write + Bash + own memory (no web tools) | Authoring code — features, fixes, refactors, library integrations. Verifies APIs against the shared research cache (`.claude/agent-memory/research-specialist/`), self-checks typecheck/lint, returns a diff report for orchestrator verification. |
 | **`bulk-editor`** | haiku / high | Read/Edit/Write | Fully-specified mechanical edits only — verbatim old→new strings, precise insertions. No judgment. |
