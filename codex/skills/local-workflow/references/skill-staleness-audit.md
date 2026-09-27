@@ -1,49 +1,30 @@
-# Post-change Guidance Audit
+# Skill and guidance staleness audit
 
-Run after every repository-changing workflow, once verification and independent review are complete.
+After implementation changes, check whether maintained project guidance still describes the code accurately.
 
-## Establish scope mechanically
+## Scope
 
-Use changed paths and key symbols to search:
+Search changed paths and key symbols across:
 
-- `.agents/skills/**`
-- Applicable root and nested `AGENTS.md`
-- `.codex/agents/**`
-- Relevant `.codex/agent-memory/<agent>/**`
+- `.agents/skills/**` for domain instructions and references;
+- the explicit rule paths routed by `docs/agent-rules/INDEX.md`;
+- relevant shared notes routed by `docs/agent-knowledge/INDEX.md`;
+- `AGENTS.md` for root-level architecture claims.
 
-Memory directories for a touched domain are included even without a text hit. A zero-scope result requires pasted evidence: no skill/agent hits, no applicable nested guidance beyond files already checked, and no relevant memory files.
+Use the owning `<prj>-<domain>-expert` when one domain clearly owns the change. Use `skill-auditor` for cross-domain or unowned changes. Auditors are read-only: they return evidence and exact edit specifications. A writer or the main thread applies confirmed updates.
 
-## Choose the auditor
-
-1. Use the owning project-domain expert when exactly one domain owns the change.
-2. Otherwise use `skill-auditor`.
-3. Use `code-digester` only as a fallback and include the output contract below.
-
-Never ask the writer to grade the guidance impact of its own work.
-
-## Brief
+## Audit brief
 
 ```text
-CHANGE SUMMARY: <what landed, why, files, renamed/added/removed interfaces>
-
-AUDIT SCOPE:
-- <skill, AGENTS.md, agent TOML, and memory paths>
+Audit project guidance after this code delta. Do not edit files.
+Changed files/symbols: <list>
+Read: <relevant skills, explicit rules, and knowledge notes>
+For each document, return FRESH or STALE with code and documentation evidence.
+For STALE items, provide an exact replacement or concise edit specification.
+Flag root AGENTS.md separately.
+Report coverage gaps and broken links.
 ```
 
-The auditor must ground truth the actual diff, read every scoped document, and return:
+Check descriptions as well as bodies: a technically correct skill can still be stale if its trigger text no longer routes the right work. Leave records that are clearly labeled archival intact; convert only active instructions to the current Codex runtime.
 
-1. `AUDIT: <n> read, <m> STALE, <k> flags`.
-2. One `FRESH`, `STALE`, or `read; no bearing` entry per scoped file.
-3. For each stale project skill, nested `AGENTS.md`, or custom agent: the exact stale statement, contradicting code `path:line`, and a minimal exact old-to-new specification.
-4. Trigger checks for skill descriptions, agent descriptions, routing entries, and nested-guidance location after moves.
-5. Flag-only findings for root `AGENTS.md` and memory owned by a different agent.
-6. Gaps and the evidence needed to close them.
-
-An owning expert may return a `MEMORY_WRITE` spec for its own memory. It remains read-only; `bulk-editor` persists the verified spec.
-
-## Apply results
-
-- Send exact specifications to `bulk-editor` and re-read the changed regions.
-- Propose root `AGENTS.md` changes to the user; never apply them silently.
-- Dispatch the owning expert for memory flagged by a cross-domain auditor.
-- Patch falsified claims; do not opportunistically rewrite the whole document.
+Apply confirmed documentation fixes within the already authorized implementation task. Do not claim that rule or knowledge files load automatically; agents reach them through their indexes and explicit dispatch instructions.

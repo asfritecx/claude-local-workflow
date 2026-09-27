@@ -1,5 +1,7 @@
 # Claude-to-Codex local-workflow port review
 
+> **Historical (2026-07-18 mapping).** This review describes the July port: an eight-step loop, per-agent memory and a research cache under `agent-memory/`. Since the 2026-09-27 sync, both runtimes use the router and playbooks, per-agent memory is retired, and shared advisory notes live in `docs/agent-knowledge/` (agents propose, the main thread applies). The capability tables below stay useful; the memory, cache and model-tier rows are superseded as marked. Current Codex install steps: `DEPLOY-CODEX.md`.
+
 Reviewed 2026-07-18 against the source kit and current official Anthropic and OpenAI documentation.
 
 ## Executive conclusion
@@ -25,10 +27,10 @@ Sources: [Anthropic skills](https://code.claude.com/docs/en/skills), [OpenAI ski
 | Capability | Claude Code | Codex | Port decision |
 | --- | --- | --- | --- |
 | Definition | `.claude/agents/*.md` with YAML + Markdown | `.codex/agents/*.toml` with required `name`, `description`, `developer_instructions` | Translate each house role into minimal TOML. |
-| Model/effort | `model`, `effort` aliases | `model`, `model_reasoning_effort` | Pin user-selected Luna/Sol/Terra tiers and fail clearly if unavailable. |
+| Model/effort | `model`, `effort` aliases | `model`, `model_reasoning_effort` | Pin user-selected tiers and fail clearly if unavailable. *Since 2026-09-27:* the Claude tiers live only in `.claude/rules/agents-roster.md`; Codex tiers live in the TOMLs and diverge on purpose. |
 | Read/write boundary | `tools`, `disallowedTools`, permission mode | `sandbox_mode`, parent permission mode, web/MCP config | Use read-only/workspace-write plus explicit web and MCP policy; qualify hosted-tool gaps. |
 | Skill preload | `skills:` injects full skill content | `skills.config` enables/disables skills; it is not documented as preloading | Require explicit read-first skill paths. |
-| Persistent agent memory | `memory:` injects and grants scoped memory access | No documented project custom-agent memory grant | Use tracked `.codex/agent-memory`; every agent returns exact specs for mediated `bulk-editor` writes. |
+| Persistent agent memory | `memory:` injects and grants scoped memory access | No documented project custom-agent memory grant | *Superseded 2026-09-27:* neither runtime uses per-agent memory. Agents return PROPOSED KNOWLEDGE UPDATES for `docs/agent-knowledge/`, and the main thread (or an assigned writer) applies them. |
 | Worktree isolation | `isolation: worktree` | No documented custom-agent isolation field | Orchestrator creates Git worktrees before conflicting writer dispatches. |
 | Per-agent turn cap | `maxTurns` can bound a custom agent | No documented per-role turn-cap field; global thread/depth settings and interruption controls exist | Use bounded briefs, the two-to-three follow-up cap, phased writers, and orchestrator interrupt/redispatch on drift. |
 | Lifecycle hooks | Per-agent and project hooks | Config-layer/project/plugin hooks; command handlers currently run | Keep the optional reminder out of the default install and document trust. |
@@ -50,6 +52,8 @@ Codex defaults to shallow agent nesting; the house workflow needs only root-to-w
 Claude's source research agent combines web tools with a project memory write exception. The Codex researcher instead runs read-only with live search, checks the tracked cache explicitly, and returns exact `CACHE_WRITE` content. `bulk-editor` persists the verified digest. All other agent-note changes use the same mediated pattern, including notes proposed by workspace writers. Writers remain web-disabled and stop with `NEEDS_CONTEXT` when the cache is missing, stale, or version-mismatched.
 
 This preserves cache-first behavior and avoids granting a read-only researcher workspace-wide write access.
+
+*Superseded 2026-09-27:* the research cache is now `docs/agent-knowledge/research/` in both runtimes. The researcher returns a PROPOSED NOTE, and the main thread applies it.
 
 ## Rules and durable guidance
 
@@ -98,7 +102,7 @@ Sources: [OpenAI hooks](https://learn.chatgpt.com/docs/hooks), [OpenAI plugin st
 ## Known non-1:1 residuals
 
 1. Hosted tools and app connectors cannot be universally allowlisted per custom agent using the documented schema.
-2. Agent memory/cache writes require a second mechanical-writer dispatch so every note change is observable and reviewed.
+2. Knowledge-note writes are applied by the main thread or an assigned writer, never by the proposing reader, so every note change is observable and reviewed. (In the July port this was a second mechanical-writer dispatch for agent memory.)
 3. Nested `AGENTS.md` cannot reproduce arbitrary Claude path globs in every root-started session.
 4. Worktree isolation is orchestrated rather than an agent manifest field.
 5. Claude's per-agent `maxTurns` has no documented Codex role-file counterpart; bounded briefs, follow-up limits, interruption, and fresh redispatch replace the hard field.

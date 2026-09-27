@@ -1,74 +1,61 @@
-# Dispatching Code Developer
+# Dispatching `code-developer`
 
-Use this brief after readers have already identified the relevant behavior and patterns. Do not ask the writer to rediscover the subsystem.
+Use `code-developer` for implementation or documentation work that requires judgment. Use one of your specialist writers, if any, when the task falls squarely inside its remit (for example schema and migrations, UI styling, or deployment infrastructure). Use `bulk-editor` only when every edit is already specified exactly.
 
 ## Brief template
 
+This is the writer form of the nine-field contract in `references/brief-contract.md`: Objective is GOAL, Ownership is SCOPE, Read first and Requirements are CONTEXT, Validation is VERIFY, the hygiene lines are FORBIDDEN, and Return is REPORT. ACCEPTANCE, TIMEBOX and STANDING are required here too.
+
 ```text
-CONTEXT: <user-visible intent and why it matters>
+Objective: <observable outcome>
 
-DIGESTED FINDINGS:
-- <confirmed fact with path:line>
-- <existing pattern to mirror with path:line>
+Ownership:
+- You own: <exact files or modules>
+- Do not edit: <adjacent or independently owned surfaces>
+- Other agents share this tree. Preserve unrelated edits and adapt to concurrent changes.
+- Never use git restore, git reset, git checkout --, git stash (any form) or git clean -f.
+- Write no per-agent memory files. Locate edits by verbatim text, not line numbers.
 
-RESEARCH CACHE POINTERS:
-- <fresh .codex/agent-memory/research-specialist/... topic files>
-- or: no external APIs touched
+Read first:
+- AGENTS.md
+- .agents/skills/<relevant-skill>/SKILL.md
+- <specific entries routed by docs/agent-rules/INDEX.md>
+- <specific code or tests>
 
-READ FIRST:
-- <applicable AGENTS.md files>
-- <applicable .agents/skills/.../SKILL.md files>
+Requirements:
+- <behavior and invariants>
+- <accepted design decisions>
+- <error and edge-case expectations>
 
-TARGET FILES: <exact create/modify/delete paths>
+External APIs:
+- <research-specialist note or official source already verified>
 
-SCOPE: <what to change and what must remain untouched>
+Acceptance:
+- <testable criteria that define done>
 
-ACCEPTANCE CRITERIA:
-- <observable behavior or exact command>
+Validation:
+- <targeted tests>
+- <your typecheck>
+- <your lint>
+- <your unit tests>
 
-CONSTRAINTS: <versions, interfaces, security boundaries, and known APIs>
+Timebox: <coverage budget>. If it runs out before Acceptance is met, stop at a safe boundary and return STOPPED with what landed and the remaining work.
+
+Standing orders: <the run's standing orders, verbatim, or "none">
+
+Return:
+- status: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | STOPPED
+- changed files and regions
+- checks with complete diagnostics
+- open questions or residual risks
 ```
 
-For a phase, append the exact phase interfaces and TDD steps from `phased-execution.md`.
+If strict red-green work is required, give the failing-test command and expected reason for failure. The writer should record both the red and green results.
 
-## Writer status contract
+## Dispatch and follow-up
 
-The first line must be one of:
+Call `collaboration.spawn_agent` with `agent_type: "code-developer"`, `fork_turns: "none"`, a unique task name, and the complete self-contained brief. Use a deliberately bounded positive `fork_turns` value only when recent context is required. A full-history fork can inherit the parent model and reasoning effort instead of the custom profile. Avoid sending conclusions that the writer should independently derive, but include decisions already made by the user or orchestrator. Inspect the spawned task's effective model, reasoning effort, and sandbox when runtime metadata exposes them. Otherwise record the configured profile and dispatch overrides separately and mark the effective profile unavailable.
 
-- `STATUS: DONE`
-- `STATUS: DONE_WITH_CONCERNS`
-- `STATUS: NEEDS_CONTEXT`
-- `STATUS: STOPPED`
+Use `collaboration.send_message` for newly discovered context while the task is running. Use `collaboration.followup_task` for a bounded next step after the agent is idle. Prefer a fresh task when ownership or the core objective changes.
 
-The report then includes:
-
-1. Files created, modified, or deleted and one-line purpose.
-2. Changed regions with complete relative `path:line` evidence.
-3. Every verification command and its complete relevant output; label failures or warnings introduced versus pre-existing.
-4. Research-cache provenance, or `no external APIs touched`.
-5. Any unverified API use; normally none because the writer stops on a gap.
-6. Any `MEMORY_WRITE` specification proposed, or none; the writer never edits agent memory directly.
-7. Concerns, stops, or open questions.
-8. Per-guidance accounting: each named `AGENTS.md`/skill path and the convention applied.
-
-## Status handling
-
-- `DONE`: independently verify the diff and proceed to the review gate.
-- `DONE_WITH_CONCERNS`: resolve correctness or scope concerns before the gate.
-- `NEEDS_CONTEXT`: fill the named gap. For external APIs, dispatch `research-specialist` as implementation-bound, persist its cache spec through `bulk-editor`, then follow up with the writer.
-- `STOPPED`: change the brief, obtain the missing decision, or split the task before continuing.
-
-Never resend an unchanged brief after a non-DONE status.
-
-## Warm-agent reuse and recovery
-
-Use follow-up messaging when a writer or reader still holds valuable context. Cap substantive follow-ups at two, exceptionally three. Then dispatch a fresh agent with the distilled findings.
-
-If a warm agent fails or overflows:
-
-1. Inspect the working tree; do not trust the last progress message.
-2. Inventory each scoped item by an exact marker.
-3. Send already-decided remainder to `bulk-editor`.
-4. Send remaining judgment work to a fresh `code-developer`.
-
-The main thread always verifies the resulting tree.
+Inspect the actual diff after completion. The writer's checks are self-checks; the main thread remains responsible for integration, independent review, and the final claim.

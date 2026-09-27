@@ -1,103 +1,82 @@
-# Deploy the local-workflow kit into a project
+# Deploy the local-workflow kit into a project (Claude Code)
 
-**This is a run-once bootstrap runbook. Whoever runs it (a human or an AI agent) should delete the whole `claude-local-workflow/` folder at the end (Cleanup).**
+**This is a run-once bootstrap runbook. Whoever runs it (a human or an AI agent) deletes the whole `claude-local-workflow/` folder at the end (Cleanup).** For Codex, follow `DEPLOY-CODEX.md` instead or as well.
 
-This kit installs the `local-workflow` orchestration skill plus its house agents into a project's `.claude/` tree. There are **two paths** — a greenfield repo needs only the baseline; an existing codebase also gets domain experts so it can be digested. If you are an AI agent running this, follow Step 0 to pick the path, then that path's steps in order.
+The kit installs the `local-workflow` skill, the shared `house-agent-contract` skill, nine house agents, three workflow rules and a `docs/agent-knowledge/` scaffold into a project. The git guard hook is optional. There are **two paths**: a greenfield repo needs only the baseline; an existing codebase also gets domain experts. If you are an AI agent running this, do Step 0, then that path's steps in order.
 
-## What's in the box
+## What gets installed where
 
-```
-claude-local-workflow/
-├── README.md                              ← repo overview (stays in the published kit; not installed)
-├── DEPLOY.md                              ← you are here; delete after deploying
-├── LICENSE                                ← MIT license (stays in the kit repo; not installed)
-├── docs/
-│   ├── anthropic-subagent-best-practices.md ← sourced Anthropic docs + engineering-post reference material (stays in the kit repo; not installed)
-│   └── anthropic-memory-rules.md          ← sourced memory/rules docs (stays in the kit repo; not installed)
-├── skills/local-workflow/
-│   ├── SKILL.md
-│   └── references/
-│       ├── adding-a-subagent.md
-│       ├── subagent-best-practices.md
-│       ├── domain-expert-template.md
-│       ├── dispatching-code-developer.md
-│       ├── phased-execution.md
-│       ├── skill-staleness-audit.md
-│       └── rule-capture.md
-└── agents/
-    ├── code-digester.md                   ← tier: read-only researcher (default worker)
-    ├── research-specialist.md             ← tier: sole external-research worker (cache-first)
-    ├── deep-analyst.md                    ← tier: read-only hard reasoning
-    ├── code-developer.md                  ← tier: judgment writer (authors code, verifies against the research cache, self-checks)
-    ├── bulk-editor.md                     ← tier: mechanical edits only
-    ├── skill-auditor.md                   ← tier: read-only post-change docs audit (skills + rules)
-    └── localworkflow-sync.md              ← house meta agent: audits the kit + guides adding domain experts
-```
+| Kit path | Installs to | Notes |
+|---|---|---|
+| `skills/local-workflow/` | `.claude/skills/local-workflow/` | Router, contracts, roster; `references/` holds the brief contract, review gate, principles and nine playbooks. |
+| `skills/house-agent-contract/` | `.claude/skills/house-agent-contract/` | Preloaded into every read-only agent via `skills:`. Not user-invocable. |
+| `agents/*.md` | `.claude/agents/` | Nine house agents (see README roster). |
+| `rules/*.md` | `.claude/rules/` | `agents-roster.md` is the only model/effort tier table. |
+| `knowledge/` | `docs/agent-knowledge/` | Shared advisory notes that agents propose and the main thread applies. Replaces per-agent memory. |
+| `hooks/` *(optional)* | `.claude/hooks/` | Git guard: blocks stash / restore / reset / `checkout --` and similar in a tree other agents share. |
 
-The seven `agents/*.md` files are the **baseline** — they install in both paths. Domain experts (`<prj>-<domain>-expert`) are project-specific and are created only in Path B (or later, once a greenfield project grows code). `research-specialist` maintains its own research cache under `.claude/agent-memory/research-specialist/`, created on first use — git-track that directory once it appears so cached lookups survive across sessions and are reusable by future writer dispatches.
----
-
-## Step 0 — Pick the path
-
-Determine the project type, then **confirm with the user before proceeding**:
-
-- Quick signals: `git log --oneline | head` (shallow / empty history → likely greenfield), and count source files (few or none → greenfield).
-- Ask the user to confirm: **"Is this a greenfield project (little/no code yet) or an existing codebase you want digested with domain experts?"**
-
-Then follow **Path A** (greenfield) or **Path B** (existing project).
+README.md, LICENSE, `docs/` and `codex/` are not installed by this runbook.
 
 ---
 
-## Path A — Greenfield (baseline only)
+## Step 0: pick the path
 
-Install just the skill + the seven baseline agents. Do **not** create domain experts yet — there is no code to pin their invariants to.
-
-1. **Pre-flight.** `mkdir -p .claude/skills .claude/agents`. If `.claude/skills/local-workflow/` already exists, back it up or skip — this kit overwrites it.
-2. **Install the skill.** `cp -R claude-local-workflow/skills/local-workflow .claude/skills/`
-3. **Install the baseline agents.** `cp claude-local-workflow/agents/*.md .claude/agents/` — installs `code-digester`, `research-specialist`, `deep-analyst`, `code-developer`, `bulk-editor`, `skill-auditor`, and `localworkflow-sync`.
-4. **Populate the Skill map (lightly).** Open `.claude/skills/local-workflow/SKILL.md` and replace the placeholder Skill-map rows with whatever skills already exist (often just a web-research row at first). Expand it as the project grows.
-5. **Verify.** `ls .claude/skills/local-workflow/ .claude/agents/` — confirm the skill, its references, and the seven agents are present.
-6. **Later, as subsystems emerge:** add a `<prj>-<domain>-expert` per major subsystem — dispatch `localworkflow-sync` (it returns the exact agent file + roster/Skill-map edits) or copy `references/domain-expert-template.md` by hand. Restart the session so each new agent registers.
-7. **Clean up** (see Cleanup).
+- Quick signals: `git log --oneline | head` (shallow or empty history suggests greenfield) and a count of source files.
+- Confirm with the user: **"Is this a greenfield project (little or no code yet), or an existing codebase you want domain experts for?"**
+- Ask once, too: **"Install the optional git guard hook?"** It needs `python3` (its test runner also needs `jq` and git 2.28 or newer) and blocks the listed git commands for you and every agent; you can still run them yourself with `! git …`.
 
 ---
 
-## Path B — Existing project (baseline + domain experts)
+## Path A: greenfield (baseline only)
 
-Install the baseline, then create domain experts for the subsystems the user names, restart to register them, and use them to digest the codebase.
-
-1. **Ask the user which domains to cover first.** "Which subsystems/domains do you want dedicated expert agents for?" (e.g. `billing`, `auth`, `inventory`). Map each to a subsystem and, if one exists, its skill under `.claude/skills/<domain>/`.
-2. **Pre-flight.** `mkdir -p .claude/skills .claude/agents` (back up any existing `local-workflow` skill).
-3. **Install the skill.** `cp -R claude-local-workflow/skills/local-workflow .claude/skills/`
-4. **Install the baseline agents.** `cp claude-local-workflow/agents/*.md .claude/agents/` (seven house agents, including `research-specialist` and `localworkflow-sync`).
-5. **Branch a domain expert per chosen domain.** Pick a short project prefix `<prj>` (for example `shop`, `api`, or `app`) and reuse it. For each domain, either:
-   - **Guided (recommended):** dispatch `localworkflow-sync` — it reads `references/domain-expert-template.md` + the domain's skill/code and returns the exact new-agent file plus the **Agent roster** + **Skill map** edit specs. Apply them (a mechanical `bulk-editor` pass works well). **or**
-   - **By hand:** `cp .claude/skills/local-workflow/references/domain-expert-template.md .claude/agents/<prj>-<domain>-expert.md`, fill every `<...>` placeholder from the domain's code/skill, and add its row to the SKILL.md **Agent roster** + a **Skill map** entry.
-6. **Populate the Skill map** with the project's real skills so the orchestrator routes threads correctly.
-7. **Restart to register the agents.** Have the user **close and reopen (restart) the project/session** — new `.claude/agents/*.md` files are not dispatchable until the harness re-scans on restart.
-8. **Digest the codebase.** After the restart, invoke `local-workflow` and let the orchestrator fan out `code-digester` and the new `<prj>-<domain>-expert` agents to read and summarize each subsystem. The experts will build up their `.claude/agent-memory/` notes as they go.
-9. **Verify.** `ls .claude/skills/local-workflow/ .claude/agents/` — confirm the skill, references, seven baseline agents, and each `<prj>-<domain>-expert` are present, then **clean up**.
+1. **Pre-flight.** `mkdir -p .claude/skills .claude/agents .claude/rules docs/agent-knowledge`. If any target file already exists (`.claude/skills/local-workflow/`, a same-named agent or rule, `docs/agent-knowledge/INDEX.md`), back it up or ask; the copies below overwrite.
+2. **Install skills.** `cp -R claude-local-workflow/skills/local-workflow claude-local-workflow/skills/house-agent-contract .claude/skills/`
+3. **Install agents.** `cp claude-local-workflow/agents/*.md .claude/agents/`
+4. **Install rules.** `cp claude-local-workflow/rules/*.md .claude/rules/`
+5. **Install the knowledge scaffold.** `cp -R claude-local-workflow/knowledge/. docs/agent-knowledge/`
+6. **Optional git guard.**
+   - `mkdir -p .claude/hooks && cp claude-local-workflow/hooks/* .claude/hooks/`
+   - Merge the entry from `.claude/hooks/settings-snippet.json` into `.claude/settings.json` under `hooks.PreToolUse` (keep any existing entries), then delete the snippet file.
+   - Test it: `bash .claude/hooks/run-guard-tests.sh .claude/hooks/cases.txt` must end with `fail=0`.
+7. **Fill the placeholders.**
+   - `.claude/skills/local-workflow/SKILL.md` Skill map: replace the `<your domain A>` / `<your domain B>` rows with the project's real skills (often just the research row at first).
+   - `.claude/agents/code-reviewer.md`: replace `<your project's standing invariants>` with the handful of invariants a reviewer must check on every delta, or delete the block.
+   - `<your typecheck>`, `<your lint>`, `<your unit tests>` in the skill: the project's real commands.
+   - `grep -rn '<your ' .claude docs/agent-knowledge` lists what is left.
+8. **Models.** Agents ship with aliases (`model: opus`; `model: fable` for `deep-analyst`) and explicit `effort:`. To hold a tier regardless of the session's model, pin full model IDs and update `.claude/rules/agents-roster.md`, which explains the tradeoff.
+9. **Restart** the session so the new agents, skills and hook register, then smoke-test: dispatch `code-digester` on one small file and check its report ends with `CITATION_CHECK: pass`.
+10. **Later, as subsystems emerge:** add a `<prj>-<domain>-expert` per major subsystem (see Path B step 3), then restart.
+11. **Clean up.**
 
 ---
 
-## Optional — SessionStart loop reminder
+## Path B: existing project (baseline plus domain experts)
 
-Projects that want a per-session nudge can have a SessionStart hook echo one line so every session opens with the loop contract in view:
+1. **Ask which domains to cover first** ("Which subsystems do you want dedicated expert agents for?", for example `billing`, `auth`). Map each to its code and, if one exists, its skill under `.claude/skills/<domain>/`.
+2. **Do Path A steps 1–9.**
+3. **Branch a domain expert per chosen domain.** Pick a short project prefix `<prj>` (for example `shop`, `api` or `app`) and reuse it. For each domain, either:
+   - **Guided (recommended):** dispatch `localworkflow-sync`. It reads `.claude/skills/local-workflow/references/domain-expert-template.md` plus the domain's skill and code, and returns the new agent file, its `docs/agent-knowledge/domain/<domain>.md` note, and the Skill map, roster and `docs/agent-knowledge/INDEX.md` edits. Apply them (a `bulk-editor` pass works well).
+   - **By hand:** copy the template to `.claude/agents/<prj>-<domain>-expert.md`, fill every `<…>` placeholder, and add its Skill map row, its row in `.claude/rules/agents-roster.md` and its domain note.
+4. **Restart** so the experts register.
+5. **Digest the codebase.** Invoke `/local-workflow` with an investigation task; it fans out `code-digester` and the new experts. Apply the knowledge-note proposals they return to `docs/agent-knowledge/` yourself (agents propose; the main thread applies).
+6. **Verify.** `ls .claude/skills/local-workflow/references/playbooks .claude/agents .claude/rules docs/agent-knowledge` shows the nine playbooks, nine house agents plus each expert, three rules and the knowledge scaffold. Then clean up.
+
+---
+
+## Optional: SessionStart reminder
+
+A SessionStart hook can echo one line so every session opens with the contract in view, for example:
 
 ```
-local-workflow: loop steps 1-8 are binding — no self-skipped steps; repo files change only via subagents (bulk-editor / code-developer)
+local-workflow: main thread owns scope, decisions and the final answer; delegate bounded work to house agents (.claude/agents); code-reviewer after code changes; shared knowledge in docs/agent-knowledge (propose, then apply)
 ```
-
-Wire it into an existing SessionStart hook (or add a minimal one via `.claude/settings.json` hooks). Skip this if the project doesn't use hooks.
 
 ---
 
 ## Cleanup (both paths)
 
-Delete the bootstrap kit — it has no place in the deployed project:
-
 ```
 rm -rf claude-local-workflow
 ```
 
-Nothing under `.claude/` depends on it after deployment. This `DEPLOY.md` and the staging folder exist only to install the kit.
+Nothing installed depends on the kit folder.

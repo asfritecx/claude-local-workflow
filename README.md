@@ -1,20 +1,25 @@
-# local-workflow — a portable orchestration kit for Claude Code and Codex
+# local-workflow: a portable orchestration kit for Claude Code and Codex
 
-A drop-in **orchestration workflow** for [Claude Code](https://claude.com/claude-code) and [Codex](https://developers.openai.com/codex): instead of letting the main agent bulk-read your codebase and blow its context, it acts as an **orchestrator** that fans out read-only subagents to read and research in parallel, then synthesizes the answer itself. This repo carries separate native skills and custom-agent definitions for both platforms, plus one-time installers.
+A drop-in **orchestration workflow** for [Claude Code](https://claude.com/claude-code) and [Codex](https://developers.openai.com/codex). The main thread owns scope, decisions, integration and the final answer. It routes each task to a playbook, and it delegates bounded, independent work to read-only house agents and briefed writers. It verifies what those agents did before it reports. The kit ships native skills, custom agents, rules and a knowledge scaffold for both platforms, plus one-time installers.
 
-> **The core idea:** the orchestrator holds the conclusion; the agents do the reading.
+> **The core idea:** the main thread holds the conclusion; bounded agents do the reading, and an independent reviewer checks the writing.
+
+Synced to myfinance f0d50696 (2026-09-27).
 
 ---
 
 ## Why
 
-The orchestration pattern is genuinely reusable, but a real installation gets tangled up with one project's specifics — its subsystems, its domain experts, its review tooling. This kit is the pattern with all of that stripped out, so you can carry it between projects and re-fill only the project-specific parts (which skills map to which threads, and which domain experts to create).
+The orchestration pattern is reusable, but a real installation gets tangled up with one project's specifics: its subsystems, its domain experts, its invariants and its checks. This kit is the pattern with all of that stripped out and replaced by placeholders, so you can carry it between projects and fill in only the project-specific parts.
 
 **What it gives you:**
-- A repeatable way to research, audit, debug-across-files, or plan in a large codebase without the main thread reading everything itself.
-- A fixed set of model/effort **tiers** so work runs at the right cost/quality regardless of your session settings.
-- A built-in discipline: **verify what agents did — never trust the self-report.**
-- A fast path to onboard a brand-new codebase (fan out experts to digest it).
+- A **router with nine playbooks** (investigation, bug-fix, feature, refactor, review, multi-phase, autonomous-run, session-pickup, docs-and-skills). Simple work skips them and is done directly.
+- A **brief contract**. Every dispatch carries GOAL, SCOPE, CONTEXT, ACCEPTANCE, VERIFY, TIMEBOX, FORBIDDEN, STANDING and REPORT, and every claim carries an evidence label (`ran`, `read`, `inferred`, `unknown`).
+- A **review gate**. `code-reviewer` runs after every code-changing wave. `adversarial-reviewer` and a model-diverse second opinion join it for design, schema, security and concurrency changes. Findings are triaged into Act on, Consider, Noted and Dismissed.
+- **Shared knowledge instead of per-agent memory.** Agents propose notes for `docs/agent-knowledge/`, and the main thread applies them.
+- **One tier table** (`.claude/rules/agents-roster.md`) that sets each agent's model and effort.
+- An **optional git guard hook** that blocks stash, restore, reset, `checkout --` and similar commands in a tree that several agents share.
+- A built-in discipline: **verify what agents did; never trust the self-report.**
 
 ---
 
@@ -22,134 +27,92 @@ The orchestration pattern is genuinely reusable, but a real installation gets ta
 
 ```
 claude-local-workflow/
-├── README.md                              ← you are here (repo overview)
-├── DEPLOY.md                              ← run-once installer; two paths (greenfield / existing)
-├── DEPLOY-CODEX.md                        ← Codex-native installer and boundary checks
-├── LICENSE                                ← MIT license (stays in the kit repo)
-├── docs/
-│   ├── anthropic-subagent-best-practices.md ← sourced Anthropic docs + engineering-post reference material
-│   ├── anthropic-memory-rules.md          ← sourced memory/rules docs (grounds skill-auditor's audit scope)
-│   └── codex-port-review.md               ← comprehensive Claude ↔ Codex capability mapping
-├── skills/local-workflow/
-│   ├── SKILL.md                           ← the orchestration skill (the workflow itself)
-│   └── references/
-│       ├── adding-a-subagent.md           ← how to author a new agent (frontmatter, body shape, smoke-test)
-│       ├── subagent-best-practices.md     ← sourced rationale (Anthropic docs + engineering posts)
-│       ├── domain-expert-template.md      ← copy-ready skeleton for a project domain expert
-│       ├── dispatching-code-developer.md  ← fill-in brief template for dispatching code-developer
-│       ├── phased-execution.md            ← multi-phase delivery protocol for complex code-authoring runs
-│       ├── skill-staleness-audit.md       ← post-change audit brief (keeps skills in sync with code)
-│       └── rule-capture.md                ← capture of review findings / quirks as path-scoped rules
-├── agents/
-│   ├── code-digester.md                   ← Tier: read-only researcher/digester (the default worker)
-│   ├── research-specialist.md             ← Tier: sole external-research worker (cache-first, web-locked elsewhere)
-│   ├── deep-analyst.md                    ← Tier: read-only hard reasoning (traces, architecture)
-│   ├── code-developer.md                  ← Tier: judgment writer (authors code, verifies against the research cache, self-checks)
-│   ├── bulk-editor.md                     ← Tier: mechanical edits only (verbatim old→new)
-│   ├── skill-auditor.md                   ← Tier: read-only post-change docs audit (skills + rules)
-│   └── localworkflow-sync.md              ← Meta agent: audits the kit + guides adding domain experts
+├── README.md                     ← you are here
+├── DEPLOY.md                     ← run-once Claude Code installer (greenfield / existing project)
+├── DEPLOY-CODEX.md               ← run-once Codex installer
+├── LICENSE
+├── docs/                         ← background research (not installed)
+│   ├── anthropic-subagent-best-practices.md
+│   ├── anthropic-memory-rules.md
+│   └── codex-port-review.md      ← historical July Claude↔Codex mapping
+├── skills/
+│   ├── local-workflow/           → .claude/skills/local-workflow/
+│   │   ├── SKILL.md              ← router, contracts, Skill map (placeholder), roster, reply contract
+│   │   └── references/
+│   │       ├── brief-contract.md, principles.md, review-gate.md
+│   │       ├── dispatching-code-developer.md, adding-a-subagent.md, domain-expert-template.md
+│   │       ├── skill-staleness-audit.md, rule-capture.md, subagent-best-practices.md
+│   │       └── playbooks/        ← the nine playbooks
+│   └── house-agent-contract/     → .claude/skills/house-agent-contract/ (preloaded into readers)
+├── agents/                       → .claude/agents/ (nine house agents)
+├── rules/                        → .claude/rules/
+│   ├── agents-roster.md          ← the only model/effort tier table
+│   ├── worktree-agent-dispatch.md
+│   └── writer-brief-crib-digests.md
+├── knowledge/                    → docs/agent-knowledge/ (INDEX + research/engineering/domain)
+├── hooks/                        → .claude/hooks/ (optional git guard, its tests and settings snippet)
 └── codex/
-    ├── skills/local-workflow/             ← Codex skill + UI metadata + references
-    └── agents/*.toml                      ← seven project-scoped Codex custom agents
+    ├── skills/local-workflow/    → .agents/skills/local-workflow/ (SKILL.md, openai.yaml, references incl. playbooks.md)
+    ├── agents/*.toml             → .codex/agents/ (the same nine house agents)
+    └── agent-rules/              → docs/agent-rules/ (Codex twins of the three rules)
 ```
 
-*(`claude-local-workflow/` is the folder `git clone` creates from this repo — you copy it into a target project's root, install from it, then delete it (see `DEPLOY.md`). If you cloned or copied it under a different folder name, substitute that name throughout.)*
+`claude-local-workflow/` is the folder `git clone` creates. You copy it into a target project's root, install from it, then delete it (see `DEPLOY.md`). If it has a different folder name, substitute that name throughout.
 
 ---
 
 ## The agent roster
 
+Model and effort tiers are set only in `rules/agents-roster.md`; the columns below mirror it.
+
 | Agent | Model / effort | Boundary | Role |
 |---|---|---|---|
-| `code-digester` | sonnet / high | read-only | **Default worker.** Digest a subsystem/file/skill, second-angle audits. |
-| `research-specialist` | opus / high | repo read-only + own memory (research cache) | **Sole external-research tier.** ALL external/current-facts threads (library APIs, versions, upgrades, CVEs, vendor docs); cache-first, web search only on a miss, digests captured back to the cache for reuse. |
-| `deep-analyst` | opus / high | read-only | Hard reasoning only — cross-file traces, architecture mapping, gnarly multi-file debugging. |
-| `code-developer` | sonnet / high | Read/Edit/Write + Bash + own memory (no web tools) | Authoring code — features, fixes, refactors, library integrations. Verifies APIs against the shared research cache, self-checks typecheck/lint, returns a diff report for you to verify. |
-| `bulk-editor` | haiku / high | Read/Edit/Write | Fully-specified mechanical edits — verbatim `old→new` strings. Makes no decisions; STOPs on ambiguity. |
-| `skill-auditor` | sonnet / high | read-only | Post-change docs audit — FRESH/STALE verdicts + exact old→new specs for project skills and `.claude/rules/`; root CLAUDE.md and domain memory flag-only. |
-| `localworkflow-sync` | sonnet / medium | read-only | Keeps the skill + roster + experts + memory aligned; **guides you to create new domain experts**. |
-| `<prj>-<domain>-expert` | sonnet / medium | read-only + own memory | *Optional, per project.* One per major subsystem, carrying that domain's invariants. Branch from the template. |
+| `code-digester` | opus / low | read-only | **Default reader.** Digest a subsystem, file or skill; audits; second-angle reads. |
+| `research-specialist` | opus / medium | repo read-only; web | **Sole external-research tier.** Cache-first at `docs/agent-knowledge/research/`; returns a digest plus a PROPOSED NOTE. |
+| `deep-analyst` | fable / high | read-only | Genuinely hard threads only: cross-file traces, architecture mapping, gnarly debugging. |
+| `code-developer` | opus / medium | writer (no web) | Authoring that needs any design, wording, placement or API decision. Self-checks and returns a diff report. |
+| `bulk-editor` | opus / low | writer | Fully specified mechanical edits only; STOPs on any mismatch. |
+| `skill-auditor` | opus / medium | read-only | Post-change docs audit: FRESH/STALE verdicts plus edit specs. |
+| `code-reviewer` | opus / high | read-only | The defect pass after every code-changing wave. Derives the delta from git. |
+| `adversarial-reviewer` | opus / high | read-only | Challenges the design when a change embodies a material design choice. |
+| `localworkflow-sync` | opus / low | read-only | Drift audits across the workflow layer and the Codex mirror; guides adding a domain expert. |
+| `<prj>-<domain>-expert` *(yours)* | opus / low | read-only | One per major subsystem, from `domain-expert-template.md`. |
 
-The **two-stage change** pattern is central: readers digest the context, then the change routes by the writer test — does applying it still require a design, wording, or API decision? Yes → `code-developer` authors it (verifying APIs against the shared research cache, self-checking, returning a diff report); no → `bulk-editor` applies the verbatim old→new spec mechanically. Judgment stays upstream; you verify every diff.
-
----
-
-## Requirements
-
-- **Claude Code** with subagent + skill support. Treat ANY agent-definition change (new file or edit) as needing a session restart before validation — mid-session hot-reload is unreliable in practice (see `references/subagent-best-practices.md` §Smoke-testing).
-- The agents use **model aliases** (`sonnet` / `opus` / `haiku`) rather than pinned model IDs, so they resolve to whatever your environment provides.
-- **Codex** with project skills and custom-agent support. The Codex roster pins `gpt-5.6-luna`, `gpt-5.6-sol`, and `gpt-5.6-terra`; verify those environment-specific slugs before installation.
-- No application dependencies. The kit is Markdown, YAML metadata, and TOML custom-agent definitions.
-
----
-
-## Install Claude Code
-
-Clone this repo (or copy the folder) into the root of the project you want to equip, then follow **[`DEPLOY.md`](DEPLOY.md)**. It branches on project type:
-
-- **Greenfield** (new/empty repo) → installs the baseline only: the skill + the seven house agents. Add domain experts later, as subsystems appear.
-- **Existing project** (a codebase to digest) → asks which domains you want experts for, installs the baseline + those experts, then has you restart the session so they register, and finally fans them out to **digest the codebase**.
-
-At a glance:
-
-```bash
-# from your target project's root, with this folder copied in as claude-local-workflow/
-mkdir -p .claude/skills .claude/agents
-cp -R claude-local-workflow/skills/local-workflow .claude/skills/
-cp    claude-local-workflow/agents/*.md          .claude/agents/
-# ...then populate the Skill map in .claude/skills/local-workflow/SKILL.md,
-#    optionally branch domain experts, restart, and delete claude-local-workflow/
-```
-
-`DEPLOY.md` and the staging folder are meant to be **deleted after installing** — they don't belong in the target project's `.claude/` tree. (This `README.md` stays in the published kit repo.)
-
-## Install Codex
-
-Follow **[`DEPLOY-CODEX.md`](DEPLOY-CODEX.md)**. It installs the Codex skill under `.agents/skills/local-workflow/` and the seven house custom agents under `.codex/agents/`, then requires model, TOML, sandbox, web, and effective MCP-boundary validation in a fresh session.
-
-The Codex port preserves the eight-step loop and reader/writer split. Where Codex lacks a literal Claude feature, it uses the strongest documented native replacement: explicit skill reads instead of `skills:` preload, mediated tracked memory writes, nested `AGENTS.md` instead of `.claude/rules/` globs, and orchestrator-created worktrees instead of per-agent isolation. See **[`docs/codex-port-review.md`](docs/codex-port-review.md)** for the full source-cited comparison and residual gaps.
-
----
-
-## Customizing per project
-
-### Claude Code
-
-Two things are project-specific and left as placeholders:
-
-1. **The Skill map** (in `SKILL.md`) — a table pairing each domain with the project skills to hand a thread, and the domain expert to dispatch. Fill it with your project's skills.
-2. **Domain experts** — one read-only specialist per major subsystem, named `<prj>-<domain>-expert` (`<prj>` is a short project prefix such as `shop`, `api`, or `app`). The fastest way to add one:
-   - **Guided:** dispatch `localworkflow-sync` — it reads the domain's skill/code and the template, then returns the exact new-agent file **plus** the roster/Skill-map edits that wire it in.
-   - **By hand:** copy `references/domain-expert-template.md`, fill the placeholders, and add its rows to the roster + Skill map.
-
-Both are documented in `references/adding-a-subagent.md`.
-
-### Codex
-
-Edit `codex/skills/local-workflow/references/project-routing.md` to map project areas to applicable `AGENTS.md`, skills, specifications, and domain experts. Register any expert in `agent-roster.md`, create its `.toml` from `domain-expert-template.md`, and materialize the target environment's effective MCP boundaries during deployment. The detailed procedure lives in the Codex-native `references/adding-a-subagent.md` and `DEPLOY-CODEX.md`.
+Readers pin a `tools:` allowlist (`Read, Grep, Glob, Bash, Skill, ToolSearch`) and preload `house-agent-contract`. `research-specialist` uses `disallowedTools` instead, so it keeps its web tools. The kit ships model **aliases**. `rules/agents-roster.md` explains when to pin full model IDs instead.
 
 ---
 
 ## How the workflow runs
 
-1. **Decompose** the task into independent threads (one per subsystem / perspective / source).
-2. **Dispatch in parallel** — fire every independent agent in one message, by tier.
-3. **Review + gap-check** the reports; look for contradictions or a finding that reframes the task.
-4. **Follow-up dispatch** to close gaps (often a verbatim extraction so you reason on ground truth).
-5. **Synthesize** — make the decision yourself; separate confirmed facts from speculation; end with the next step.
-6. **Gate code changes** — self-verify (diff/typecheck/lint), then run your project's independent review on the delta. Present findings, judge them, ask — never auto-fix.
-7. **Audit docs staleness** — after any repo-change run, establish coverage mechanically and dispatch one read-only verdict pass. Claude audits `.claude/skills/**`, `.claude/rules/**`, and relevant `.claude/agent-memory/**`; Codex audits `.agents/skills/**`, nested `AGENTS.md`, `.codex/agents/**`, and `.codex/agent-memory/**`. Both return FRESH/STALE verdicts and exact old-to-new specifications.
-8. **Capture durable lessons** — Claude uses a small path-scoped `.claude/rules/` file. Codex uses the closest safely scoped `AGENTS.md`, proposing root-wide guidance rather than silently editing it; agent-memory changes remain mediated.
+1. **Route.** Classify the task and pick one playbook, or do it directly if it is one or two files with no design decision. Copy the playbook's steps into the todo list, and mark a skipped step `skip: <reason>`.
+2. **Brief.** Every dispatch carries the nine brief fields. Independent agents go out in one message. A pilot runs before a large fan-out.
+3. **Verify.** Inspect the delta yourself, run the project's checks, and treat each agent's report as a self-report, not proof.
+4. **Review.** Run the review gate after every code-changing wave, triage the findings, and bind the verdict to the tree state.
+5. **Keep guidance current.** Audit the touched skills and rules, apply knowledge-note proposals, and prefer a mechanism over a new rule when a defect exposes a durable invariant.
+6. **Report** by the reply contract: outcome first, then files, checks with evidence labels, review dispositions, what was not verified, residual risks, deferred work, and an account of every dispatched agent.
 
-Full detail — including the binding loop contract (steps are never self-skipped) — lives in `skills/local-workflow/SKILL.md` for Claude and `codex/skills/local-workflow/SKILL.md` for Codex.
+Full detail lives in `skills/local-workflow/SKILL.md` and its `references/` (Claude), and in `codex/skills/local-workflow/SKILL.md` (Codex).
 
 ---
 
-## Notes on portability
+## Install
 
-This kit was extracted from a working installation and deliberately genericized: all project-domain references, project file paths, and any one review-tool's commands were removed and replaced with placeholders or tool-agnostic principles. If you adopt it and want an independent review gate, wire in whatever review tooling your project uses at step 6.
+- **Claude Code:** follow **[`DEPLOY.md`](DEPLOY.md)**. Copy the kit folder into the target project's root and ask your agent to run it, or run it by hand. It installs the skills, agents, rules and knowledge scaffold, optionally the git guard, then asks you to fill the placeholders, restart, and smoke-test.
+- **Codex:** follow **[`DEPLOY-CODEX.md`](DEPLOY-CODEX.md)**. It installs `.agents/skills/local-workflow/`, the nine `.codex/agents/*.toml` and the `docs/agent-rules/` twins, and shares `docs/agent-knowledge/` with the Claude install.
 
-`research-specialist` is the sole web-research tier. Claude keeps its git-tracked cache under `.claude/agent-memory/research-specialist/` and may preload an Exa-style research skill. Codex uses `.codex/agent-memory/research-specialist/`, live web plus approved research MCP sources, and returns exact `CACHE_WRITE` content for mediated persistence through `bulk-editor`. Every other agent, including `code-developer`, is web-locked and reports an uncached need as a research gap.
+Restart the session after installing. New agents, skills and hooks are picked up at session start.
+
+---
+
+## Customizing per project
+
+Everything project-specific is a `<placeholder>`. `grep -rn '<your ' .claude docs/agent-knowledge` lists what is left after install.
+
+1. **The Skill map** in `SKILL.md`: pair each domain with the project skills a stream should receive, and with its domain expert.
+2. **Domain experts:** one read-only `<prj>-<domain>-expert` per major subsystem (`<prj>` is a short project prefix such as `shop`, `api` or `app`). Dispatch `localworkflow-sync` to draft one, or fill `references/domain-expert-template.md` by hand.
+3. **`code-reviewer` invariants:** the handful of project invariants a reviewer must check on every delta.
+4. **Checks:** `<your typecheck>`, `<your lint>`, `<your unit tests>`.
+5. **Pre-commit gate** (optional): if your project has one, commits go through it. The workflow never commits or pushes unless the user asks.
 
 ---
 

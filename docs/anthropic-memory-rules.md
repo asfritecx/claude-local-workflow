@@ -1,6 +1,6 @@
 # Claude Code memory & rules — research findings
 
-Compiled 2026-07-07 from the official Claude Code memory documentation. This snapshot grounds the kit's post-change docs audit (loop step 7 / `agents/skill-auditor.md`): what the docs layer is made of, how `.claude/rules/` loads, and the official mandate to keep it current. Quotes are verbatim from the source.
+Compiled 2026-07-07 from the official Claude Code memory documentation. This snapshot grounds the kit's post-change docs audit (`agents/skill-auditor.md`, run from the docs-and-skills playbook and `skills/local-workflow/references/skill-staleness-audit.md`): what the docs layer is made of, how `.claude/rules/` loads, and the official mandate to keep it current. Quotes are verbatim from the source.
 
 ## 1. The docs layer
 
@@ -36,8 +36,9 @@ Project instructions live in CLAUDE.md files (project root and `.claude/CLAUDE.m
 
 - **Rules are audit targets with edit specs.** They are topic-scoped docs whose technical claims are as falsifiable as a skill's, and the official guidance mandates removing outdated instructions. `skill-auditor` treats `.claude/rules/**/*.md` like skills — FRESH/STALE verdicts plus exact old→new specs.
 - **Root CLAUDE.md, auto-memory, and `~/.claude/rules/` stay flag-only.** They are the user's curated/personal layer — the audit quotes stale claims, never specs direct edits.
+- **Shared agent knowledge is propose-only.** The kit keeps no per-agent memory; advisory notes live in `docs/agent-knowledge/` (installed from `knowledge/`). The auditor returns PROPOSED KNOWLEDGE UPDATES for those notes, and the main thread applies them.
 - **`paths:` globs are part of the audit.** A renamed or moved directory silently orphans a path-scoped rule (it stops loading for the files it was written for) — the auditor checks globs still match after renames, mirroring its skill-description trigger check.
-- **Rules are also the capture surface for new lessons.** Loop step 8 turns confirmed review findings and durable mid-run quirks into new path-scoped rules — §4's "when to add" heuristics are the bar; the working guide is `skills/local-workflow/references/rule-capture.md`.
+- **Rules are also the capture surface for new lessons.** After a confirmed defect or a durable mid-run quirk, the workflow considers a mechanism first and then a new path-scoped rule — §4's "when to add" heuristics are the bar; the working guide is `skills/local-workflow/references/rule-capture.md`.
 
 ## Sources
 

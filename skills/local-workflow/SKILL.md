@@ -1,146 +1,148 @@
 ---
 name: local-workflow
-description: Use when tackling any substantial multi-step task in a project where answering well means reading or researching across many files, project skills, or external sources — research, analysis, security audits, cross-file debugging, planning, implementing or reviewing a feature, or "look into / analyze / investigate / build / review X". The house orchestration workflow; delegate reading to parallel subagents and synthesize yourself. Triggers on "be an orchestrator", "use sonnet agents", "don't read the code yourself", "delegate this", "digest/summarize the codebase", or any task big enough to need fan-out. Do NOT use for trivial single-fact lookups or one-line edits you can finish in one step. You MUST follow this workflow strictly.
+description: Coordinate substantial research, debugging, implementation, review, or planning across multiple files or domains. Use when the task benefits from bounded house subagents, specialist ownership, or independent review — "look into / analyze / investigate / build / review X", "delegate this", "be an orchestrator", "use house agents". Skip simple work the main thread can finish directly, such as single-fact lookups or one-line edits.
 user-invocable: true
 ---
 
-# Local orchestration workflow — delegate, don't bulk-read
+# Local workflow: main thread plus bounded house agents
 
-The house pattern for substantial tasks: **you are an orchestrator.** You do not bulk-read code or docs in the main thread — you decompose the task, fan out Sonnet subagents to read and research in parallel, review what comes back, fill gaps, then synthesize the answer yourself. The orchestrator holds the conclusion; the agents do the reading. DO NOT use generic Explore agents.
+The main thread owns scope, decisions, integration and the final answer. It may do straightforward reads and edits itself. Delegate bounded, independent work when parallel reading or a specialist materially improves the result, never just to satisfy a workflow shape.
 
-```
-Task ──▶ [Orchestrator = you]
-            │  1. decompose into independent threads
-            ├──▶ code-digester  (digest a subsystem / read a skill+code)  ─┐
-            ├──▶ code-digester  (audit / second angle)                    ├─▶ reports
-            └──▶ research-specialist (external research — cache-first)    ─┘
-            │  3. review reports → find gaps & contradictions
-            └──▶ deep-analyst   (hard trace / verbatim extraction)        ─▶ report
-            │  changes to make? delegate the writing (you never write repo files)
-            ├──▶ code-developer (authors code, verifies against the research cache, self-checks) ─▶ diff report
-            └──▶ bulk-editor    (applies fully-specified mechanical specs)     ─▶ edit report
-            │
-            ▼  5. synthesize: decisions + recommendations + next step (you, main thread)
-            ▼  6. changed code? → run your review gate on the diff (independent check — never auto-fix)
-            ▼  7. changed behavior? → skill-auditor re-checks the docs layer (skills + rules)
-            ▼  8. durable lesson? → capture it as a path-scoped rule (.claude/rules/)
-```
+## Route first
 
-## The loop
+Classify the task, pick one playbook, and copy its steps into the todo list verbatim. Mark any step you skip `skip: <reason>`, so the skip stays visible. When the user says "new task" or the work changes kind, route again.
 
-1. **Decompose** the task into independent threads — one per subsystem, perspective, or knowledge source (e.g. "digest the architecture", "audit it", "research the external standard"). Threads must not depend on each other's output. **Scale the fan-out to the task:** a single-subsystem digest is 1 agent; a typical cross-file task 2–4 threads; a comprehensive audit or "be thorough" request 5+ plus a second wave. Agents are bad at judging effort on their own — you set it at dispatch. Scale by **reading volume** too, not just thread count: a brief pointing one agent at more than ~15–20 substantial files or >~100KB of source will burn most of its context window before it reports — split it into parallel shards, each returning its own digest. **For code-authoring tasks, also evaluate complexity against the phased-mode entry criteria** — spans ≥2 subsystems, ~4+ files each carrying a design decision, schema+code+UI stacked in one change, or needing more than one `code-developer` dispatch — and propose a phase list at a run-start STOP when it qualifies; see `references/phased-execution.md`.
-2. **Pick each thread's skills, then dispatch in parallel.** Choose which project skills each thread needs via the **Skill map** below and name the exact `.claude/skills/<skill>/SKILL.md` paths in that agent's prompt. Then fire every independent agent in ONE message, dispatching by `subagent_type` from the **Agent roster** below.
-3. **Review + gap-check.** Read the reports. Look for missing pieces, contradictions, or a finding that reframes the task (e.g. an existing fix that *should* have already solved the problem).
-4. **Follow-up dispatch.** Send focused agents to close gaps — often a VERBATIM extraction ("quote rules 11001–11008 exactly") so you can reason on ground truth, not paraphrase. Don't stop at the first wave; the sharpest insight usually comes from the second.
-5. **Synthesize.** Reconcile the reports into the answer: make the decision, separate confirmed facts from speculation, and end with the concrete next step. This is your job, not an agent's — never just concatenate agent outputs.
-6. **Gate the delta through review.** At synthesis, classify `git status`: any changed repo file outside the project's user-granted docs-only waiver (if it has one — note it in the ledger when applied) → self-verify first (git diff, typecheck/lint), then run your project's independent review gate on the diff — see Quality-control below. Zero changed files is the only other skip, recorded in the ledger — never a judgment. **In phased runs, this step's timing changes:** the gate runs per phase, on the phase delta, as each phase completes rather than once at synthesis — clean → orchestrator commits + auto-advances to the next phase, any finding → STOP. The final synthesis still closes step 6's dispositions for the whole run. See `references/phased-execution.md`.
-7. **Audit docs staleness after the change lands.** After any run that changed repo files, establish coverage mechanically: grep the changed paths and key symbols across `.claude/skills/**` and `.claude/rules/**`, and always expand relevant `.claude/agent-memory/<prj>-*/` directories derived from the touched domain(s). Any skill/rule hit or any relevant memory file → dispatch one read-only docs verdict pass — the touched domain's `<prj>-<domain>-expert` if exactly one domain owns the change and a matching expert exists (it may refresh its own memory in the same pass), else `skill-auditor` when available, else `code-digester` as fallback only with the `skill-auditor` Output contract pasted into the brief; it returns FRESH/STALE verdicts with exact old→new edit specs (root CLAUDE.md and auto-memory flag-only; domain memory flag-only when reported by `skill-auditor`). Dispatch owning `<prj>-*` experts for any domain-memory refreshes the auditor flags, then apply doc specs via `bulk-editor` in the same run. Zero-hit n/a requires no skills/rules grep hits and no relevant memory files; paste that evidence into the ledger. "Not warranted" from memory is never a disposition. Read `references/skill-staleness-audit.md` for the brief skeleton.
-8. **Capture durable lessons as project rules.** A confirmed review finding or a mid-run gotcha that would bite again becomes a small path-scoped `.claude/rules/` file. Gate-derived proposals ride the step-6 STOP (fixes and rules approved together); qualifying quirks are created via `bulk-editor` and reported in the synthesis. Read `references/rule-capture.md` for the rule-worthiness bar, the dedupe ladder, and the rule shape.
+| The task is… | Playbook |
+|---|---|
+| One or two files, no design decision | **Direct:** do it, verify it on the right surface, report. No playbook needed. |
+| "How does X work / where is / why does" | `references/playbooks/investigation.md` |
+| Something is broken | `references/playbooks/bug-fix.md` |
+| New behavior | `references/playbooks/feature.md` |
+| Same behavior, simpler code | `references/playbooks/refactor.md` |
+| Judge existing work (a branch, diff, PR or design) | `references/playbooks/review.md` |
+| Two or more subsystems, or dependent milestones | `references/playbooks/multi-phase.md` |
+| Unattended "until X passes" | `references/playbooks/autonomous-run.md` |
+| Resuming or pausing a run | `references/playbooks/session-pickup.md` |
+| Skills, rules, agents, docs | `references/playbooks/docs-and-skills.md` |
 
-**The loop is binding.** A step is never self-skipped: if you believe one doesn't apply, surface that as a proposal at a STOP — the user decides, this run; standing memories or cost never waive anything (the sole standing waiver is step 6's docs-only one). The only self-serve disposition is mechanical: `git status` shows zero repo changes at synthesis → steps 6–8 close `n/a — zero repo changes`. **Never Write/Edit a repo file from the main thread** — every repo change (code, docs, rules, configs, new files, one-line fixes) lands via `code-developer` or `bulk-editor`; deletions: run `git rm` yourself and record it in the ledger. In phased mode (`references/phased-execution.md`), after a phase passes its gate the orchestrator runs `git add`/`git commit` itself and records the SHA in the ledger — the run-start phase-plan approval is the standing authorization to do so. Change runs open the ledger with a step-disposition table (steps 1–8: `done | n/a — zero repo changes | user-waived: "<quote>"`; step 8 closes `considered: <outcome>` — the rule-worthiness bar judges content, never whether the step runs) and the synthesis ends with the step 6–8 dispositions.
+Principles fire on triggers, such as the second failed fix or adding structure. They are listed in `references/principles.md`.
 
-## Dispatch prompt template
+Always:
+- Check the branch (your project's branch notes in CLAUDE.md, if any).
+- Preserve unrelated work already in the tree.
+- Ask the user only about a material choice, a destructive action, an external mutation or expanded authority.
+- Settle an observable fact with a quick experiment instead of asking.
 
-Every agent prompt follows this skeleton. Vague prompts return vague reports — be explicit about scope and shape.
+## Contracts
 
-```
-You are a research agent assisting an orchestrator. Read-only — do NOT modify files.
+- **Brief contract** (`references/brief-contract.md`):
+  - Every dispatch carries GOAL, SCOPE, CONTEXT, ACCEPTANCE, VERIFY, TIMEBOX, FORBIDDEN, STANDING and REPORT. A missing field means no dispatch.
+  - That file also holds the evidence labels (`ran` / `read` / `inferred` / `unknown`), the verification levels, the standing-orders register, and the fan-out and liveness rules: one message per wave, pilot before fan-out, don't poll, retry according to how it failed, account for every agent.
+- **Writers** (`references/dispatching-code-developer.md`):
+  - A writer owns only the files named in its brief. Parallel writers need disjoint file sets.
+  - The writer test: does applying the change need any decision? If yes, use `code-developer` or a specialist writer. If no, use `bulk-editor` with a verbatim old→new spec.
+- **Review gate** (`references/review-gate.md`):
+  - Run `code-reviewer` after every code-changing wave.
+  - Add `adversarial-reviewer`, plus the same `code-reviewer` brief with a per-call `model: "fable"` (or another model family than your session's), for a design choice, schema change, security-sensitive path, concurrency or caching boundary, or a user request to challenge the approach.
+  - Triage findings into Act on / Consider / Noted / Dismissed. Record confirmed / rejected / deferred with a reason and who raised it, and bind the verdict to the tree state.
+- **Knowledge:**
+  - `docs/agent-knowledge/INDEX.md` routes to advisory notes; re-verify them in code.
+  - Readers propose note updates, and the main thread or an assigned writer applies them.
+  - External or current facts go only to `research-specialist`, which checks `docs/agent-knowledge/research/` first. Pre-warm research before a writer touches an external library, because writers can't web-search.
 
-CONTEXT: <1–3 sentences: the task + why it matters for the decision being made>
+## Skill map: pick the relevant skills per stream
 
-FIRST: read <.claude/skills/X/SKILL.md> to orient (skills are directories — read the SKILL.md file inside, not the dir, which throws EISDIR), then <specific code paths / docs>.
-<External/current facts: route that thread to research-specialist instead; readers may cite the shared research cache (.claude/agent-memory/research-specialist/) and must report uncached needs as RESEARCH GAPs.>
+Scan every available skill by **name and description** (or `ls .claude/skills/`) and pick what matches. This map covers the high-signal pairings and indexes relevance only. Name skills by file path, `.claude/skills/<skill>/SKILL.md`: a skill is a directory, and reading the directory throws EISDIR.
 
-DELIVERABLES — return ALL of:
-1. <specific structured item>
-2. <specific structured item>
-...
-
-Return distilled facts + plain relative `path:line` refs + targeted snippets.
-Repeat the full relative path on every citation, even for the same file. Do
-not use Markdown links, `file://` URLs, absolute paths, URL-encoded paths,
-`#L123` anchors, or bare line-only citations like `:123` for repo evidence.
-When citing several lines in one file, repeat the full path on each — WRONG
-`some-file.ts:700, 737, 774`, RIGHT `src/module/some-file.ts:700, src/module/some-file.ts:737, src/module/some-file.ts:774`.
-Do NOT dump whole files. Quote VERBATIM where fidelity matters (config, rule
-bodies, schemas).
-```
-
-## Skill map — pick the relevant skills per thread
-
-Every agent's first step is to read the project skills you point it at, so choosing the right ones is the orchestrator's job, not the agent's. Scan every available skill by **name + description** (already in your context, or run `ls .claude/skills/`) and pick what matches the thread. Populate the table below per project — one row per domain, listing the skill names to hand a thread and any domain-pinned expert to dispatch (see the Agent roster).
-
-<!-- Populate per project. Replace these placeholder rows with real domain → skill pairings.
-     `<prj>` is this project's short prefix (for example `shop`, `api`, or `app`); see references/domain-expert-template.md. -->
+<!-- Populate per project. Replace the placeholder rows with real domain → skill pairings.
+     `<prj>` is this project's short prefix (for example `shop`, `api` or `app`); see references/domain-expert-template.md. -->
 
 | When the task touches… | Hand the agent these skills |
 |---|---|
-| `<domain A>` (e.g. billing) | `<skill-1>`, `<skill-2>` — dispatch **`<prj>-<domain>-expert`** if one exists |
-| `<domain B>` (e.g. auth) | `<skill-3>`, `<skill-4>` — dispatch **`<prj>-auth-expert`** if one exists |
-| `<cross-cutting concern>` | `<skill-5>` |
-| Web/external research, current facts | dispatch **research-specialist** — sole web tier, cache-first (`.claude/agent-memory/research-specialist/`); your web-research skill (e.g. `exa-web-research`) is preloaded by that agent only — the orchestrator no longer hands it out |
+| `<your domain A>` (for example billing) | `<your skill-1>`, `<your skill-2>`. Dispatch **`<prj>-<domain-a>-expert`** if one exists. |
+| `<your domain B>` (for example auth) | `<your skill-3>`, `<your skill-4>`. Dispatch **`<prj>-<domain-b>-expert`** if one exists. |
+| Web or external research, current facts | Dispatch **`research-specialist`**, the sole web tier. It returns a digest plus a PROPOSED NOTE for you to apply. |
+| Local workflow, agent sync | `local-workflow` and its references. Dispatch **`localworkflow-sync`**. |
 
-The map indexes *relevance* only — full descriptions live in each skill's frontmatter. Keep it curated as skills are added, renamed, or removed. If the project has multiple product lines/branches, note branch-variant skills here.
+**Cross-cutting skills:** list the skills every stream touching a given surface should also receive (for example a security or data-handling skill whenever user data is read or written, or a UI skill whenever rendered UI changes).
 
-## Agent roster — dispatch by `subagent_type`
+## Agent roster
 
-The house subagents bake model + effort + read/write boundary into `.claude/agents/`, so dispatching by `subagent_type` locks the tier regardless of the session level. This is the orchestrator's main lever — pick the agent, not a raw model.
+Model and effort tiers live only in `.claude/rules/agents-roster.md`.
 
-| `subagent_type` | Tier | Boundary | Dispatch it for |
-|-----------------|------|----------|-----------------|
-| **`code-digester`** | sonnet / high | read-only | **Default for most threads** — digest a subsystem/file/skill, audits, second-angle reads. |
-| **`research-specialist`** | opus / high | repo read-only + own memory (research cache) | **Sole external-research tier** — ALL external/current-facts threads (library APIs, versions, upgrades, CVEs, vendor docs); cache-first (checks `.claude/agent-memory/research-specialist/` before searching), web search only on a miss, digests captured back to that cache for reuse. |
-| **`deep-analyst`** | opus / high | read-only | Hard reasoning only — cross-file traces, architecture mapping, gnarly multi-file debugging. |
-| **`code-developer`** | sonnet / high | Read/Edit/Write + Bash + own memory (no web tools) | Authoring code — features, fixes, refactors, library integrations. Verifies APIs against the shared research cache (`.claude/agent-memory/research-specialist/`), self-checks typecheck/lint, returns a diff report for orchestrator verification. |
-| **`bulk-editor`** | haiku / high | Read/Edit/Write | Fully-specified mechanical edits only — verbatim old→new strings, precise insertions. No judgment. |
-| **`skill-auditor`** | sonnet / high | read-only | Post-change docs audit (loop step 7) — FRESH/STALE verdicts + exact old→new specs for project skills and `.claude/rules/`; root CLAUDE.md and domain memory flag-only. |
-| **`localworkflow-sync`** | sonnet / medium | read-only | Meta agent — audits this skill + the agent roster + domain experts + memory for drift, and guides creating/wiring a new `<prj>-<domain>-expert`. |
-| **`<prj>-<domain>-expert`** | sonnet / medium | repo read-only + own memory | *(optional, per project)* One per major subsystem — carries that domain's invariants, preloads its skill. Branch from `references/domain-expert-template.md`. |
+| `subagent_type` | Boundary | Dispatch it for |
+|---|---|---|
+| **`code-digester`** | read-only | **Default reader:** digest a subsystem, file or skill; audits; second-angle reads. |
+| **`<prj>-<domain>-expert`** *(optional, per project)* | read-only | A stream squarely in that domain. Each expert preloads its domain skills and reads its note under `docs/agent-knowledge/domain/`. |
+| **`localworkflow-sync`** | read-only | Drift audits across the workflow and agent layer, the knowledge wiring and the Codex mirror; guides adding a new domain expert. |
+| **`deep-analyst`** | read-only | Genuinely hard threads only: cross-file traces, architecture mapping, gnarly debugging. Its pinned tier is slower and costlier (`.claude/rules/agents-roster.md`). |
+| **`research-specialist`** | repo read-only; web | The sole external-research tier. |
+| **`code-developer`** | writer | Authoring that needs any design, wording, placement or API decision. It checks its own work and returns a diff report. |
+| **`bulk-editor`** | writer | Fully specified mechanical edits only. |
+| *your specialist writers, if any* | writer | Specialist execution in their surfaces (for example schema, infra or UI). |
+| **`skill-auditor`** | read-only | Post-change docs audit: FRESH/STALE verdicts plus edit specs. |
+| **`code-reviewer`** | read-only | The defect pass after every code-changing wave. It derives the delta from git. |
+| **`adversarial-reviewer`** | read-only | A design challenge when a change embodies a material design choice. |
 
-Full trigger scopes live in each agent's frontmatter `description` (don't duplicate them here). A `<prj>-<domain>-expert` is a project-specific extension: `<prj>` is a short project prefix, `<domain>` matches a skill. Each preloads its domain skill(s), carries the domain invariants, keeps persistent notes in `.claude/agent-memory/<name>/`, and produces edit specs for `bulk-editor` or context briefs for `code-developer`. To add one, dispatch `localworkflow-sync` (it reads the domain skill and returns the exact new-agent file + roster/Skill-map edit specs) or follow `references/domain-expert-template.md` + `references/adding-a-subagent.md` by hand.
+**Routing and dispatch:**
+- **Pick the agent.** Default to `code-digester`. Use the matching `<prj>-<domain>-expert` for a single-domain stream, `skill-auditor` for cross-domain docs audits, and `deep-analyst` only when it's genuinely hard. Prefer house agents over `Explore` or `general-purpose`, including in plan mode. Use `general-purpose` only for a read-and-act thread no house agent covers, and say which capability was missing.
+- **Warm or fresh.** Continue a warm reader with `SendMessage` while its context is relevant, for example to draft a writer's spec. Send writers fresh consolidated briefs instead.
+- **Model override.** A per-call `model` accepts aliases only, and there is no per-call effort. An alias from a different model family than the session gives a real cross-family run; a same-family alias collapses to the session model.
+- **Shared contract.** Read-only house agents preload `house-agent-contract`, which covers the read-only rule, citation form, evidence labels, the timebox and knowledge proposals. Don't restate those in briefs.
 
-- **Routing:** default to `code-digester`; use a matching `<prj>-<domain>-expert` when a thread is squarely in its domain; use `skill-auditor` for loop-step-7 cross-domain, undomained, or no-matching-expert docs-staleness work, with `code-digester` only as fallback; `deep-analyst` only when a thread is genuinely hard (deep code comprehension); **`code-developer` whenever code must be AUTHORED** — any change that still requires a design, wording, or API decision; `bulk-editor` only when the edit is purely mechanical and fully specified. The writer test: does applying the change require any decision? Yes → `code-developer`; no → `bulk-editor`. When unsure among readers outside the docs-staleness path, use `code-digester`. **External/current-facts threads always go to `research-specialist`** — `code-digester` and `deep-analyst` may only read the shared research cache (`.claude/agent-memory/research-specialist/`) and must report uncached needs as RESEARCH GAPs, never search the web themselves.
-- **Orchestrator PRE-WARM rule.** Before dispatching a writer (`code-developer`) whose brief touches an external library, verify the research cache covers it — dispatch `research-specialist` first if it doesn't, marking that pre-warm dispatch **implementation-bound** so any stale entry it finds is refreshed rather than served as-is — then pass the cache pointers/digest into the writer's brief (`references/dispatching-code-developer.md` §RESEARCH CACHE POINTERS). Writers cannot web-search; an uncached API forces a `NEEDS_CONTEXT` round-trip.
-- **Two-stage changes: readers digest, writers write, you verify.** Have readers digest the context, then dispatch `code-developer` with the digested findings, the exact target files, and the relevant `.claude/skills/<skill>/SKILL.md` paths — you still own step 6 and never write repo files in the main thread. Fully-specified edits (verbatim old→new strings, precise insertion points) skip the writer and go straight to `bulk-editor`. **Reuse the warm reader** for the spec or brief via `SendMessage` (it still holds the files — zero re-reading), but **cap warm reuse at 2 — exceptionally 3 — resume rounds**: a 4th crosses a 200K window and dies mid-run ("Prompt is too long", observed 2026-07-05). **Writers run one at a time** unless their file sets are provably disjoint. Read `references/dispatching-code-developer.md` for the fill-in brief template, the warm-reuse rules, and crash recovery. **Multi-phase delivery runs** (complex code-authoring changes, per the step-1 entry criteria) follow `references/phased-execution.md` instead of this single-shot path.
-- **No generic readers — even in plan mode.** `code-digester` is the universal reading fallback; reading threads never go to `Explore`/`general-purpose`. Plan mode changes nothing: the house read-only agents ARE the explorers (they satisfy its read-only constraint), and a harness phase default never overrides this skill once invoked. `general-purpose` is allowed only for a read+act thread no house tier covers — name the missing capability in the ledger (it follows the session model, no pinned effort).
-- **Effort policy.** General readers/reviewers, hard-analysis readers, and all writers pin `high`; `localworkflow-sync` and every `<prj>-<domain>-expert` pin `medium`. In a Workflow script, effort is the `effort` option on `agent()`. In chat (Agent tool) there is **no per-call effort** — it follows the session, *unless* the named subagent pins its own via `effort:` in its `.claude/agents/<name>.md` frontmatter (all house agents do).
+## Implement, review, keep guidance current
 
-## Quality-control what agents do — you own it
+- **After every code-changing wave:**
+  1. Inspect the delta yourself (`git diff`, untracked files).
+  2. Run proportionate checks (`<your typecheck>`, `<your lint>`, `<your unit tests>`, targeted tests).
+  3. Run the review gate.
+  4. Fix confirmed in-scope findings, and re-review when a fix changes behavior.
+- **Scope of the gate.** Docs-only changes get a lighter editorial check. Phases are integration checkpoints, not commit points: no commits or pushes unless the user asked. If your project has a pre-commit gate, commits go through it.
+- **Verify agent work yourself.** An agent's final message is a self-report, not proof.
+  - Check the diff against the ask: all of the requested change, and only that.
+  - Prefer a runnable check over prose.
+  - Read-only reports must use plain relative `path:line` citations. Treat anything else as malformed evidence to correct or verify independently.
+- **Keep guidance current after a change lands.**
+  - Audit the touched skills and rules: the owning `<prj>-<domain>-expert` for a single domain, or `skill-auditor` for a cross-domain change (`references/skill-staleness-audit.md`).
+  - When a confirmed defect exposes a durable invariant, prefer a mechanism over prose, then consider a rule (`references/rule-capture.md`).
 
-Dispatching the work does not dispatch the responsibility. An agent's final message is a **self-report** — a claim about what it did, not proof. When an agent *does* something (edits a file, writes code, runs a command, applies a config change), the orchestrator owns its correctness: verify before you report it done.
+## Finish: the reply contract
 
-- **Verify write/edit work yourself — don't relay the agent's diff.** The agent's summary is the claim, not the check. Confirm independently: re-read the changed region (the sanctioned use of a single targeted Read) or run `git diff` / the build / the linter.
-- **Check it against the ask.** All of the requested change, only that, and nothing it shouldn't touch. Agents over-reach, miss a case, or quietly drop a constraint.
-- **Check evidence formatting.** Read-only reports should use plain relative `path:line` refs. Treat Markdown file links, `file://` URLs, absolute paths, URL-encoded paths, `#L123` anchors, and bare line-only citations like `:123` as malformed evidence that needs correction or independent verification.
-- **Prefer a runnable check over prose.** If a build, test, or command can confirm the work, run it (or dispatch one that does). "Done" in an agent report is not evidence.
-- **On a gap, re-dispatch and re-verify** — then tell the user what you verified and how it stands, not what the agent claimed.
-- **Independent review gate — the check after code changes.** Self-verification above is necessary but not independent. Once edits are applied and self-verified, run your project's independent review on the git delta (a static analyzer, a review subagent, or a separate model), always on a defect pass and — when the change embodied a design decision — on an adversarial pass with 1–2 lines of task-derived focus. Present findings by severity with your own true/false-positive judgment, then STOP and ask which findings to fix — never auto-apply review fixes. The same STOP carries any rule proposals a confirmed finding earned (loop step 8 — see `references/rule-capture.md`).
-
-## Gotchas
-
-- **Stay out of the files.** Don't Read/Grep code to *understand* a subsystem — that's the agent's job. A single targeted Read to confirm one known line before an edit is fine; reading to learn an area is not.
-- **Parallel means one message.** Independent agents go in a single response block, not serialized. Serializing wastes wall-clock for nothing.
-- **Demand structure.** Give every agent a numbered DELIVERABLES list and ask for `file:line` refs + snippets, not whole-file dumps. Ask for verbatim quotes when you'll reason on the exact text (config, schemas, rule bodies).
-- **Budget each dispatch's context.** One well-defined subtask per dispatch; shard any brief naming more than ~15–20 substantial files or >~100KB of source. A reader's transcript amplifies its reading 2–3× (search output, re-reads, report drafting) — a scope that fits once does not fit twice. See `references/subagent-best-practices.md` § Context budgeting & overflow recovery.
-- **A warm agent that dies mid-run ("Prompt is too long") is gone.** Its ID cannot be resumed — the resume replays the same over-long input — and its last progress message understates what actually landed. Inventory the working tree yourself (one grep marker per scoped item), route the fully-specified remainder to `bulk-editor`, and re-dispatch a fresh writer for the rest.
-- **Keep a durable ledger on multi-phase change runs.** Your own context can be compacted mid-run, and the most expensive failure mode is re-dispatching work that already landed. Append one line per completed phase to a scratch ledger file (`Phase N: done — files touched, self-check clean`); after any compaction, trust the ledger + `git diff` over your recollection. Open it with the loop contract's step-disposition table. In `references/phased-execution.md` runs, each row also carries the review outcome and commit SHA: `Phase N: done — <files>, self-check clean, review clean, commit <sha>`.
-- **Surface → judge → decide.** Route external/current facts (library APIs, CVEs, versions) to `research-specialist`, which cites source URLs and caches the digest for reuse — never training knowledge. If a second-wave finding reframes the task, pivot the synthesis around it. Separate confirmed from speculative and say plainly what to do next.
-- **Review gates need a git delta.** A review gate diffs local git state — a dirty working tree or a `--base` branch delta. Research-only means `git status` shows zero repo changes at synthesis — a ledger-recorded fact, not a judgment. And findings never chain into an auto-fix: present, judge, ask.
+- **Lead with the outcome.**
+- **Then:**
+  - files changed;
+  - checks run, each with its evidence label and verification level;
+  - review dispositions, with who raised each;
+  - dismissed findings;
+  - what was not verified, and why;
+  - residual risks;
+  - deferred work;
+  - an account of every dispatched agent.
+- **Style.** Write plain sentences, not symbol-speak. "No" and "not verified" are acceptable answers. Never claim verification you didn't perform.
 
 ## When NOT to use
 
-Skip the fan-out for trivial single-fact lookups, a one-line edit, or anything answerable from context already in the conversation. Delegation has overhead — if you'd finish it faster yourself, do that.
+Skip the fan-out for single-fact lookups, a one-line edit, or anything answerable from context already in the conversation. If you'd finish faster yourself, do that.
 
 ## Adding a house subagent
 
-To add a new tier or specialist to `.claude/agents/`, read `references/adding-a-subagent.md` for the full procedure (frontmatter fields, the "When invoked" body shape, registry re-scan, smoke-test, and what to keep in sync). Read `references/domain-expert-template.md` when creating a per-subsystem domain expert. Read `references/subagent-best-practices.md` for the sourced rationale (official docs + Anthropic engineering posts) whenever you design or review an agent definition.
+- **Procedure:** `references/adding-a-subagent.md` covers frontmatter, body shape, registry pickup, the smoke test and the sync list.
+- **Per-subsystem expert:** use `references/domain-expert-template.md`, or dispatch `localworkflow-sync` to draft one.
+- **Sourced rationale:** `references/subagent-best-practices.md`.
 
 ## Keep in sync
 
-- **`.claude/agents/*.md`** — the agent definitions (the seven house agents — `code-digester`, `research-specialist`, `deep-analyst`, `code-developer`, `bulk-editor`, `skill-auditor`, `localworkflow-sync` — plus any `<prj>-<domain>-expert`). On any model/effort/boundary/roster change, update the **Agent roster** table here and `references/adding-a-subagent.md`. Keep each `<prj>-<domain>-expert` aligned with its domain skill's invariants; smoke-test after a change; dispatch `localworkflow-sync` for a drift check and to be guided through creating a new one.
-- **`references/dispatching-code-developer.md`** — the orchestrator's fill-in brief template for `code-developer`. It restates that agent's `## Output` contract and non-default-workflow rule; re-check both sections when `.claude/agents/code-developer.md`'s `## When invoked` or `## Output` changes.
-- **`references/phased-execution.md`** — the canonical multi-phase delivery protocol (entry criteria, run-start STOP, per-phase cycle, branch/worktree policy, ledger row shape, testing bar). Re-check when the per-phase cycle, commit convention, or branch/worktree policy changes; keep in lockstep with the phase-brief fields in `references/dispatching-code-developer.md`.
-- **`references/skill-staleness-audit.md`** — dispatch guide for loop step 7. Re-check when the Skill map's shape, the domain-expert pattern, the step's wording, or the `skill-auditor` Output contract changes.
-- **`references/rule-capture.md`** — the guide for capturing review findings and mid-run quirks as path-scoped `.claude/rules/` files (loop step 8). Re-check it when the loop's step numbering, the review gate's result handling, or the staleness audit's scope changes.
-- **Skill map** — keep curated as skills are added, renamed, or removed. It indexes *relevance* only; never copy skill descriptions into it (they live in each skill's frontmatter and would drift).
-- Otherwise this is a meta-skill not tied to repo code: update it only if the available agent types, model names, or dispatch conventions change.
+- **`.claude/agents/*.md`:**
+  - On a model or effort change, update `.claude/rules/agents-roster.md`, which is the only tier table.
+  - On a boundary or roster change, update the Agent roster table above and `references/adding-a-subagent.md`.
+  - Agent changes may need a session restart before they take effect (`.claude/rules/agents-roster.md` § Reload caveat).
+- **`.claude/skills/house-agent-contract/SKILL.md`:** re-check `references/brief-contract.md` and `references/domain-expert-template.md` when it changes.
+- **`references/review-gate.md`** and **`references/dispatching-code-developer.md`:** re-check when the matching agent's `## When invoked` or `## Output` changes.
+- **The playbooks, `references/brief-contract.md` and `references/principles.md`:** re-check when the router table, a brief field or a principle name changes. The playbooks cite principles by name.
+- **`references/skill-staleness-audit.md`:** re-check when the Skill map, the domain-expert pattern or `skill-auditor`'s Output changes.
+- **`references/rule-capture.md`:** re-check when the rule shape or the `docs/agent-rules/` mirror convention changes.
+- **Skill map:** keep it curated as skills are added, renamed or removed. Never copy skill descriptions into it.
+- **Codex mirror** (if installed): `.agents/skills/local-workflow/`, `.codex/agents/*.toml` and `docs/agent-rules/`.
+  - Mirror shared facts only: roles, boundaries, invariants and paths.
+  - Never mirror model or effort tiers; they diverge on purpose.
+- **`docs/agent-knowledge/INDEX.md`:** re-check the domain-note routing when a `<prj>-<domain>-expert` is added, renamed or rescoped.

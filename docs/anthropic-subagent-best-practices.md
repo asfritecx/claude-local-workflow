@@ -1,5 +1,7 @@
 # Anthropic subagent best practices — research findings
 
+> **Research snapshot, 2026-07-06.** The sourced findings below still hold as background. For the current model, alias, effort, tool-restriction and reload facts, use `knowledge/research/claude-code-subagents.md` (installed as `docs/agent-knowledge/research/claude-code-subagents.md`, fetched 2026-09-27), which supersedes this file where they differ. The kit's agents pin aliases (`opus`; `fable` for `deep-analyst`), and per-agent memory is retired in favour of `docs/agent-knowledge/`.
+
 Compiled 2026-07-06 from official Claude Code / Claude API documentation, Anthropic engineering posts, and (clearly labeled) community reports. This document holds the *research layer* behind the kit: deeper operational facts that `skills/local-workflow/references/subagent-best-practices.md` — the curated house reference — deliberately keeps out to stay short. Read the reference first; come here when you need the economics, the platform mechanics, or the source trail.
 
 Labels: **[OFFICIAL]** = docs.claude.com / code.claude.com / anthropic.com / claude.com blog. **[COMMUNITY]** = everything else — treat as *reported*, not fact.

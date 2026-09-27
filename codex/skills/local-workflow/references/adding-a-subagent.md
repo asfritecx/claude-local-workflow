@@ -1,47 +1,30 @@
-# Adding a Custom Agent
+# Adding a project custom agent
 
-Use when adding a house tier or project-domain expert to `.codex/agents/`.
+Use this procedure when a recurring responsibility needs a distinct prompt, model tier, or read/write boundary. Prefer an existing agent plus a precise dispatch brief when the need is one-off.
 
-## Authoring procedure
+Source of truth: [OpenAI Codex subagents documentation](https://learn.chatgpt.com/docs/codex/subagents).
 
-1. Create `.codex/agents/<name>.toml`. Match the filename to `name` and use lowercase kebab-case.
-2. Define the required fields:
+1. Choose a narrow role with clear inputs, outputs, ownership, and exclusions.
+2. Create `.codex/agents/<name>.toml`. The `name` field is authoritative; matching the filename is the project convention.
+3. Define the required fields: `name`, `description`, and `developer_instructions`.
+4. Set `model` and `model_reasoning_effort` according to the roster policy in `subagent-best-practices.md`.
+5. Configure `sandbox_mode = "read-only"` for readers and reviewers and include a behavioral instruction not to edit. This is the custom agent's default, not proof of the effective sandbox: a parent or live runtime override may broaden it. For enforced read-only execution, use a read-only parent or runtime. Verify the effective child sandbox when runtime metadata exposes it; otherwise state that enforcement could not be independently observed.
+6. Instruct the agent to read applicable `.agents/skills/<skill>/SKILL.md`, `docs/agent-rules/INDEX.md`, and `docs/agent-knowledge/INDEX.md` entries explicitly. Codex custom agents do not support Claude-style `skills:` preloading or memory injection.
+7. Update the roster documentation and any dispatch references that name the new role.
+8. Start a new Codex session if the current client has not discovered the new definition, then forward-test with a realistic self-contained prompt using `fork_turns: "none"` or a deliberately bounded positive value. Verify the effective model, reasoning effort, and sandbox when runtime metadata exposes them. Otherwise report the configured profile and dispatch overrides, and mark the effective profile unavailable rather than inferring it from TOML.
 
-   ```toml
-   name = "<name>"
-   description = "Specific trigger and boundary."
-   developer_instructions = """
-   <role, workflow, boundaries, and output contract>
-   """
-   ```
+Minimal shape:
 
-3. Pin the intended tier with `model` and `model_reasoning_effort`. Verify the slug in the local Codex model registry; do not silently fall back.
-4. Set `sandbox_mode = "read-only"` for readers and `web_search = "disabled"` for every non-research agent. Use `mcp_servers = {}` in the portable template. During deployment, replace it with every effective inherited MCP server's non-secret transport fields plus `enabled = false`; disabled entries without a command or URL fail runtime role deserialization.
-5. In `developer_instructions`, require applicable `AGENTS.md`, project skill, and memory paths to be read explicitly. Codex has no Claude-style custom-agent `skills:` preload or scoped injected memory grant.
-6. Give the agent one focused role, a numbered startup procedure, operating boundaries with stop conditions, and a self-contained output contract.
-7. Register it in `agent-roster.md` and `project-routing.md`. Update `localworkflow-sync` when the roster semantics change.
-8. Parse the TOML, run an ephemeral fresh session with `--strict-config`, smoke-test a small task, and negatively test the intended sandbox/web boundary.
+```toml
+name = "example-reviewer"
+description = "Read-only reviewer for a specific recurring risk."
+model = "gpt-6-sol"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+developer_instructions = """
+Read AGENTS.md and every project skill or rule named in the dispatch.
+Review only the assigned delta. Return severity-ranked findings with file references and concrete failure scenarios. Do not edit files.
+"""
+```
 
-## Tier selection
-
-- `gpt-5.6-luna` / `max`: high-volume code digestion and workflow synchronization.
-- `gpt-5.6-sol` / `high`: difficult analysis and security review.
-- `gpt-5.6-sol` / `medium`: research synthesis and guidance audits.
-- `gpt-5.6-terra` / `high`: implementation work.
-- `gpt-5.6-luna` / `high`: exact mechanical edits.
-
-These are this kit's pinned roles, not universal Codex recommendations. An installation lacking a slug must stop and ask the user for a replacement.
-
-## Read-only memory
-
-Read-only agents never receive workspace-write merely to maintain notes. They read `.codex/agent-memory/<name>/` explicitly and return an exact `MEMORY_WRITE` or `CACHE_WRITE` specification. The orchestrator verifies it and dispatches `bulk-editor` to persist it.
-
-## Smoke-test checklist
-
-- Description routes the intended prompt to the new agent.
-- Agent reads the named guidance before repository files.
-- Report matches the requested deliverables and uses complete `path:line` evidence.
-- Read-only mutation attempts fail.
-- Non-research web and configured MCP attempts are unavailable or refused.
-- Memory updates are returned as specs, not written by a read-only agent.
-- A changed agent definition is tested in a new session; do not rely on hot reload.
+Test that the role is discoverable, reads the named guidance, respects its behavioral boundary, and returns the requested contract. Record configured and effective profiles separately when the runtime exposes both; otherwise mark the effective profile unavailable. Do not claim automatic skill loading or persistent injected memory.

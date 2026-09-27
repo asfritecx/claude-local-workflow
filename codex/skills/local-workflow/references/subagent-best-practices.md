@@ -1,49 +1,41 @@
-# Codex Subagent Best Practices
+# Codex subagent best practices
 
-This is the Codex-specific rationale for the house pattern. Review against current official documentation when custom-agent or skill behavior changes.
+Source of truth: [OpenAI Codex subagents documentation](https://learn.chatgpt.com/docs/codex/subagents) and the repository's `.codex/agents/*.toml` files.
 
-## Native surfaces
+## When delegation helps
 
-- Project skills live under `.agents/skills/<name>/SKILL.md`; Codex initially sees skill metadata and loads the body after activation. Skills use `name` and `description` frontmatter, with optional UI/dependency metadata in `agents/openai.yaml`. Source: https://learn.chatgpt.com/docs/build-skills
-- Project custom agents live under `.codex/agents/*.toml`. Required fields are `name`, `description`, and `developer_instructions`; model, reasoning, sandbox, MCP, and other config keys may override the parent layer. Source: https://learn.chatgpt.com/docs/agent-configuration/subagents
-- Codex can spawn, inspect, follow up, interrupt, and wait for subagent threads. Current local releases delegate after a direct request or applicable project/skill instruction. Source: https://learn.chatgpt.com/docs/agent-configuration/subagents
-- `AGENTS.md` provides durable repository guidance. Put specialized rules in the closest subtree and keep the root concise. Source: https://learn.chatgpt.com/docs/agent-configuration/agents-md
+Delegate bounded, independent work whose separate context or specialist instructions improve speed or quality. Read-heavy exploration, external research, focused implementation, and independent review are strong candidates. Keep tightly coupled decisions and small edits in the main thread.
 
-## Differences from Claude Code
+All agents share the same working directory. Assign non-overlapping write ownership, tell every writer to preserve others' changes, and inspect the combined tree before validation. A custom agent's `sandbox_mode` is a configured default plus a behavior contract. Parent or live runtime overrides may broaden the effective sandbox. When filesystem enforcement matters, start from a parent or runtime with the required sandbox and verify the effective child profile.
 
-Claude custom agents expose YAML `tools`, `disallowedTools`, `skills`, `memory`, hooks, and worktree isolation. Claude skills also expose invocation/tool/model/path controls. Sources: https://code.claude.com/docs/en/sub-agents and https://code.claude.com/docs/en/skills
+## Real collaboration controls
 
-Codex custom agents are configuration layers rather than dedicated manifests. The documented format does not provide a universal built-in tool allow/deny list, automatic skill-body preload, scoped persistent agent-memory grant, or declarative per-agent worktree isolation. Use:
+- `collaboration.spawn_agent({ agent_type, task_name, message, ... })` creates a bounded task. `agent_type` selects a built-in or `.codex/agents/*.toml` custom agent.
+- `collaboration.send_message({ target, message })` delivers context to an existing agent without starting an idle turn.
+- `collaboration.followup_task({ target, message })` delivers work and triggers an idle agent.
+- `collaboration.wait_agent({ timeout_ms })` waits for mailbox activity. Use a long useful timeout rather than frequent polling.
+- `collaboration.interrupt_agent({ target })` stops the current turn when it is no longer useful.
 
-- `sandbox_mode`, `web_search`, and MCP enable/disable config for the strongest native role boundary.
-- Explicit read-first skill and memory paths.
-- Mediated `bulk-editor` writes for read-only memory/cache updates.
-- Orchestrator-created Git worktrees for conflicting writers.
-- Narrow developer instructions for any hosted-tool boundary that native config cannot enforce.
+For profile-pinned agents, use `fork_turns: "none"` with a self-contained brief, or a deliberately bounded positive value when limited recent history is needed. A full-history fork can inherit the parent model and reasoning effort instead of the custom profile. Omit explicit model overrides in normal use so the selected custom agent file supplies its configured tier. If runtime metadata exposes the effective model, reasoning effort, and sandbox, inspect it before claiming which profile ran. If it does not, report the configured profile and dispatch overrides separately and mark the effective profile unavailable. Custom agents do not receive project skills or curated knowledge automatically; prompts must name the files they need to read.
 
-Codex plugins can distribute skills, hooks, apps, and MCP configuration, but the documented plugin manifest does not bundle project custom-agent TOMLs. This kit therefore uses a copy-based deployment runbook rather than claiming a plugin-only 1:1 port. Source: https://learn.chatgpt.com/docs/build-plugins
+## Roster policy
 
-## Context and topology
+Project custom agents live in `.codex/agents/*.toml`. Each declares `name`, `description`, and `developer_instructions`; model pins use `model` and `model_reasoning_effort`.
 
-- Delegate independent, context-heavy reading; keep requirements and synthesis in the main thread.
-- Bound each dispatch and request a distilled report. Multi-agent work costs more tokens and write-heavy concurrency increases conflicts.
-- Group threads by the context they need, not merely by activity type.
-- Prefer fresh agents after two substantial follow-ups, exceptionally three, to avoid replaying an oversized transcript.
-- Respect live thread capacity. Codex defaults and product limits can change; never hard-code fan-out count in a prompt.
-- Keep nesting at the default depth unless a concrete workflow requires recursive delegation.
+| Roles | Model / effort | Boundary |
+| --- | --- | --- |
+| `code-digester`, `research-specialist`, `skill-auditor`, `localworkflow-sync`, any `<prj>-<domain>-expert` agents | `gpt-6-luna` / max | Read and distill; readers may propose curated-note updates. The main thread or an explicitly assigned writer applies them. |
+| `code-developer` | `gpt-6-sol` / medium | General implementation and documentation authoring. |
+| `deep-analyst` | `gpt-6-astra` / high | Difficult multi-file reasoning, read-only. |
+| `code-reviewer`, `adversarial-reviewer`, your specialist writers, if any | `gpt-6-sol` / high | Reviewers are read-only; writers stay within specialist boundaries. |
+| `bulk-editor` | `gpt-6-luna` / max | Fully specified mechanical edits only. |
 
-## Verification
+This routing follows [OpenAI's model selection guidance](https://developers.openai.com/api/docs/guides/model-selection): Sol for coding and judgment, Luna for scoped work, and Astra for difficult analysis. Keep the configured reasoning efforts stable when comparing model changes. `bulk-editor` uses Luna / max because the runtime model catalog did not offer its originally intended effort tier for Luna. The installer may adjust these tiers to the models your runtime offers.
 
-The generator's report is not proof. Independently inspect changes and run deterministic checks. Use a fresh read-only agent for the review gate, and require the user to disposition findings before fixes.
+Use the role description as the routing authority. `research-specialist` owns web and current-fact research. Readers return evidence and edit specifications; writers apply changes. `code-reviewer` independently checks every code-changing wave, and `adversarial-reviewer` challenges material design choices.
 
-## Permissions
+## Prompt shape
 
-Subagents inherit the parent permission environment, and live parent overrides are reapplied. A permissive parent can supersede a read-only custom-agent default, just as Claude parent bypass modes can supersede agent permission settings. Always report the effective mode and avoid representing prompt-only restrictions as a hard sandbox.
+Include the objective, ownership, raw evidence or known context, required project skills and rules, constraints, expected deliverable, and validation. State whether the agent may edit. Do not assume it can ask the user for missing product decisions; route such decisions back to the main thread.
 
-## Installation checks
-
-1. Verify model slugs locally.
-2. Parse every TOML.
-3. Confirm active web and MCP tools for each role in a fresh session.
-4. Negative-test read-only mutation.
-5. Forward-test realistic dispatch and report shapes.
+Keep reuse practical. A follow-up is useful when the agent still has relevant context. Spawn a fresh task when the objective or ownership changes materially, or when a concise brief is clearer than replaying a long thread.

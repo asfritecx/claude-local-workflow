@@ -1,0 +1,241 @@
+2	git stash
+2	git stash drop
+2	cd x && git -C y stash push -- a.ts
+2	git checkout -- a.ts
+2	git checkout .
+2	git checkout main -- src/a.ts
+2	git checkout HEAD src/db/schema.ts
+2	git checkout package.json
+2	git checkout docs
+2	git checkout -f main
+2	git checkout -qf main
+2	git checkout --pathspec-from-file=list.txt
+2	git reset HEAD a.ts
+2	git reset --hard
+2	git reset --soft HEAD~1
+2	git restore --staged a.ts
+2	git clean -fd
+2	git clean -xdf
+2	git switch --discard-changes main
+2	git switch -f main
+2	git pull --rebase --autostash
+2	git rebase --autostash origin/main
+2	git worktree remove --force .worktrees/x
+2	bash -c "git stash pop"
+2	bash -lc 'git restore a'
+2	FOO=1 git stash
+2	env GIT_DIR=x git reset
+2	/usr/bin/git restore a
+2	GIT stash
+2	eval git stash
+2	ls; git --no-pager -c core.x=y reset
+2	git status\ngit stash
+2	# discard my edit\ngit checkout -- a.ts
+2	ls # note\ngit stash
+2	curl -s http://x/#frag; git stash
+2	echo ${#arr[@]}; git reset --hard
+2	if git diff --quiet; then git stash; fi
+2	for f in a b; do git checkout -- "$f"; done
+2	{ git stash; }
+2	! git stash
+2	git \\\n  stash
+2	git checkout \\\n  -- a.ts
+2	echo "$(git stash)"
+2	echo `git stash`
+2	x=$(git stash)
+2	( git stash )
+2	sudo -u me git stash
+2	nice -n 5 git reset --hard
+2	timeout 30 git stash
+2	git diff --name-only | xargs git checkout --
+2	find . -name x -exec git checkout -- {} ;
+2	cd src && git checkout lib/utils.ts
+0	git status
+0	git diff HEAD | shasum -a 256
+0	git stash list
+0	git stash show -p
+0	git checkout main
+0	git checkout main --
+0	git checkout main 2>&1
+0	git checkout main 2>/dev/null || git checkout -b main
+0	git checkout main >/dev/null 2>&1
+0	git checkout main > /dev/null
+0	git checkout main &>/dev/null
+0	git checkout feat/x 2>&1 | tail -5
+0	git checkout -b feat/x
+0	git checkout -b feat/x origin/main
+0	git checkout -b feat/x origin/main 2>&1
+0	git checkout -B feat/x origin/main >/dev/null
+0	git checkout -
+0	git checkout @{-1}
+0	git checkout --detach HEAD~3
+0	git checkout -t origin/feat
+0	git clean -n
+0	git clean -n -d
+0	git switch main
+0	git switch main 2>&1
+0	git pull --rebase
+0	git log --oneline -10
+0	git log -- .
+0	git show main:src/db/schema.ts
+0	git apply -R x.patch
+0	git worktree list
+0	git worktree add ../wt -b feat
+0	git worktree remove ../wt
+0	git help stash
+0	git stash-like-alias
+0	git comm""it -m "never git stash or git reset here"
+0	git comm""it -m "$(cat <<'EOF'\nfix: don't git reset\ngit checkout -- a.ts\nEOF\n)"
+0	git comm""it -F - <<EOF\nfix: stop using git stash\ngit reset --hard is bad\nEOF
+0	cat > f.md <<'EOF'\ngit checkout -- a.ts\nEOF\ngit status
+0	cat > notes.md <<'END-NOTE'\nDon't run git stash here.\nEND-NOTE
+0	cat > notes.md <<\\EOF\nDon't run git reset here.\nEOF
+0	cat > notes.md <<\\EOF\ngit checkout -- a.ts is banned\nEOF
+0	echo "use <<EOF heredocs"\ngit status
+0	echo "git stash is banned"
+0	grep -rn 'git reset' docs
+0	rg -n "git (stash|reset|restore)" docs .claude
+0	diff <(git show HEAD:a) b
+0	python3 x.py # git stash
+0	gh pr view 1
+0	npm run lint 2>&1 | tail -20
+0	echo ${#arr[@]}; git status
+2	git checkout '*.ts'
+2	git checkout src/lib/*.ts
+2	git checkout 'src/[ab].ts'
+2	cat > /tmp/n.md <<EOF\n$(git reset --hard)\nEOF
+2	cat > /tmp/n.md <<EOF\nnote `git stash`\nEOF
+2	git comm""it -m "$(cat <<'EOF'\nIt's done\nEOF\n)" && git reset --hard
+2	find . -name x -exec bash -c 'git stash' ;
+2	git clean -f -- --help
+2	git checkout -- --help
+0	git clean -fn
+0	git clean -f --dry-run
+0	git restore --help
+0	git stash --help
+0	git reset -h
+0	cat > /tmp/n.md <<'EOF'\n$(git reset --hard)\nEOF
+0	git comm""it -m "$(cat <<'EOF'\nIt's done (really)\nEOF\n)" && git status
+2	bash <<'EOF'\ngit reset --hard\nEOF
+2	cat <<'EOF' | sh\ngit stash\nEOF
+2	zsh -s <<EOF\ngit clean -fd\nEOF
+2	cat <<'EOF' | tee /tmp/x | bash\ngit stash\nEOF
+2	x=$(( 1 <<\n2 ))\ngit stash
+2	((x=1<<2))\ngit stash
+2	(( x = 1 << 2 ))\ngit reset --hard
+2	echo $[1<<2]\ngit reset --hard
+2	find . -name x -exec echo {} \; -exec git clean -fdx \;
+2	git stash push -m --help
+2	git clean -f -e --help
+2	git clean -f --exclude --help
+2	git clean -fdx -eenv
+2	git clean -f -e -n
+2	git clean -f -- -n
+2	git clean --forc -d
+2	git checkout --forc main
+2	git switch --discard main
+2	git pull --autost
+2	x=$(echo ")"; git reset --hard)
+2	x=$(grep -c "foo)" f); git stash
+2	x=$(echo "it's"); git stash
+2	x=$(cat <<<foo\n(\nfoo\ncat <<EOF)\ndon't\nEOF\n)\ngit stash
+0	bash script.sh <<'EOF'\ngit reset --hard\nEOF
+0	cat > f.sh <<'EOF'\ngit reset --hard\nEOF\nbash -n f.sh
+0	x=$(( 1 << 20 )); git status
+0	for ((i=0; i<3; i++)); do git status; done
+0	git checkout 'HEAD^{/fix.*typo}'
+0	git checkout ${branches[0]}
+0	git checkout "${arr[$i]}"
+0	git stash push --help
+0	git clean -nfd
+0	git clean -f -n
+0	x=$(cat <<<foo\n(\nfoo\ncat <<EOF)\ngit stash\nEOF\n)
+2	find . -name '*.ts' -exec git checkout {} \;
+2	find . -name '*.ts' -exec git checkout {} +
+2	((git reset --hard) || true)
+2	((cd /tmp && git stash) )
+2	cd src/lib && bash <<'EOF'\ngit checkout utils.ts\nEOF
+2	cd src/lib && cat <<'EOF' | sh\ngit checkout utils.ts\nEOF
+2	for i in 1 2; do (( m <<= 1 )); done\ngit reset --hard
+2	if (( x << 1 )); then :; fi\ngit reset --hard
+2	bash -O extglob <<'EOF'\ngit stash\nEOF
+2	bash <<< 'git reset --hard'
+2	echo "$(echo "$(echo "$(echo "$(git stash)")")")"
+2	find . -exec find . -exec find . -exec find . -exec git reset --hard \;
+2	git checkout -bfeature -f
+0	bash -n <<'EOF'\ngit reset --hard\nEOF
+0	git checkout -bfeature
+0	git switch -cfeat
+0	grep x <<< 'git reset --hard'
+0	find . -name '*.ts' -exec git log -- {} \;
+0	if (( n < 2 )); then git status; fi
+0	cat <<'EOF' | git comm""it -F -\nfix: stop git reset --hard\nEOF
+2	cd src/lib && echo "$(git checkout utils.ts)"
+2	cd src/lib && x=$(git checkout utils.ts)
+2	cd src/lib && echo `git checkout utils.ts`
+0	echo $(git checkout utils.ts)
+2	(cat <<'EOF'; echo) | bash\ngit stash\nEOF
+2	{ cat <<'EOF'; } | sh\ngit reset --hard\nEOF
+2	(echo; cat <<'EOF') | bash -s\ngit stash\nEOF
+0	(cat <<'EOF'; echo) | grep x\ngit stash\nEOF
+0	{ cat <<'EOF'; } | wc -l\ngit reset --hard\nEOF
+2	python3 - <<'EOF'\nimport subprocess\nsubprocess.run(["git", "stash"])\nEOF
+2	python3 -c 'import os; os.system("git reset --hard")'
+2	python3 -c "import subprocess; subprocess.check_call('git stash', shell=True)"
+2	python3 <<'EOF'\nimport os\nos.execvp("git", ["git", "reset", "--hard"])\nEOF
+2	cat <<'EOF' | python3\nimport os\nos.system("git stash")\nEOF
+2	node -e 'require("child_process").execSync("git checkout -- a.ts")'
+2	node -e "require('child_process').spawnSync('git', ['stash'])"
+2	perl -e 'system("git", "stash")'
+2	ruby -e '`git stash`'
+2	ruby -e 'system("git reset --hard")'
+0	python3 - <<'EOF'\nprint("never run git stash")\nEOF
+0	python3 -c 'subprocess.run(["git", "status"])'
+0	node -e 'console.log("git reset --hard")'
+0	python3 check.py <<'EOF'\nos.system("git stash")\nEOF
+0	perl -ne 'print if /git stash/' notes.txt
+2	git -c rebase.autoStash=true rebase origin/main
+2	git -c merge.autostash pull
+2	git -c rebase.autostash=yes -c merge.autostash=true merge x
+2	git --config-env=rebase.autoStash=AUTOSTASH rebase main
+0	git -c rebase.autoStash=false rebase origin/main
+0	git -c rebase.autoStash=true rebase --no-autostash origin/main
+0	git pull --rebase
+0	git -c color.ui=always log
+2	(cd src/lib; git checkout utils.ts)
+2	python3 -c "import subprocess as sp; sp.run(['git','reset','--hard'])"
+2	perl -le 'print qx(git stash)'
+2	node --eval="require('child_process').execSync('git stash')"
+2	python3 -W ignore -c 'import os; os.system("git stash")'
+2	bash -c "python3 -c 'import os; os.system(\"git stash\")'"
+2	git -c rebase.autoStash rebase main
+2	python3 <<< 'import os; os.system("git clean -fd")'
+2	cd src && python3 -c 'import subprocess; subprocess.run(["git", "checkout", "lib/utils.ts"])'
+0	python3 script.py -c 'os.system("git stash")'
+0	echo "run('git stash')"
+0	python3 -c 'import json; print(json.dumps({"a": 1}))'
+0	git pull
+0	git rebase -i HEAD~3
+0	node -e 'const {execSync} = require("child_process"); console.log(execSync("git status").toString())'
+0	git checkout -b feature/x
+0	python3 -m pytest -k "git stash"
+0	perl -i.bak -pe "s/a/b/" f.txt
+0	perl -l015 -ne "print" f
+2	node -pe "require('child_process').execSync('git reset --hard')"
+2	node -p -e "require('child_process').execSync('git stash')"
+2	python3 -c "import os; os.system('git status\\ngit stash')"
+2	python3 -c "import subprocess; subprocess.run(args=['git','stash'])"
+0	python3 - <<'PY'\ns = s.replace('x', 'Never run `git stash` here')\nPY
+0	python3 -c "print('to fix it, run \"git reset --hard\" manually')"
+0	perl -i -pe 's/`git stash`/`git stash push`/' notes.md
+0	node -e '/^git (\w+)/.exec("git reset --hard")'
+0	git log --oneline | head -1; echo "$(bash -c "echo \$(python3 -c 'print(1)')")"
+0	python3 -c "# os.system('git stash')"
+0	python3 - <<'EOF'\nprint('run("git stash")')\nEOF
+0	python3 - <<'EOF'\nprint(f"use {x} not os.system('git stash')")\nEOF
+2	python3 - <<'EOF'\nimport os\nos.system("git stash")  # run it\nEOF
+2	python3 - <<'EOF'\nimport os\ns = "text"\nos.system("git stash")\nEOF
+2	python3 -c 'import subprocess; subprocess.run(("git", "stash"))'
+2	python3 -c 'import subprocess; subprocess.run(("git", "stash")'
+2	git -c rebase.autostash=2 rebase main
+0	git -c rebase.autostash=0 rebase main

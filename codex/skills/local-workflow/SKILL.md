@@ -1,56 +1,104 @@
 ---
 name: local-workflow
-description: Orchestrate substantial multi-step repository work by delegating focused reading, external research, implementation, mechanical edits, review, and documentation audits to specialized Codex subagents. Use for cross-file research, architecture analysis, security audits, difficult debugging, planning, feature implementation, code review, or requests to delegate, fan out, investigate, digest, build, or review a non-trivial change. Do not use for a trivial lookup or one-line edit that is faster and clearer to complete directly.
+description: Coordinate substantial research, debugging, implementation, review, or planning across multiple files or domains. Use when the task benefits from bounded subagents, specialist ownership, or independent review; skip for simple work the main thread can complete directly.
 ---
 
 # Local Workflow
 
-Act as the orchestrator: retain requirements, decisions, verification, and the final synthesis in the main thread; delegate bounded reading and execution to the narrowest suitable custom agent.
+Keep the main thread responsible for scope, decisions, integration, and the final answer. Use subagents when independent work can run in parallel or when a specialist materially improves quality. The main thread may complete straightforward reads and edits itself.
 
-Read `references/agent-roster.md` before the first dispatch. Read `references/project-routing.md` to select project guidance and domain experts for each thread.
+## Route first
 
-## Binding loop
+Classify the task, then pick one playbook from [playbooks](references/playbooks.md):
+- investigation;
+- bug fix;
+- feature;
+- refactor;
+- review;
+- multi-phase;
+- autonomous run;
+- session pickup and pause;
+- docs, skills, rules and agents.
 
-1. **Inspect and decompose.** Check the working tree and applicable `AGENTS.md`. Split the task by independent context, subsystem, or evidence source. Shard a reading brief that names more than roughly 15-20 substantial files or 100 KB of source. For implementation work, evaluate the entry criteria in `references/phased-execution.md`; if any match, read it and obtain its run-start phase, branch/worktree, and commit-authorization decisions before phase 1.
-2. **Dispatch readers first.** Start all independent agents before waiting. Use `code-digester` by default, `deep-analyst` for hard traces, `research-specialist` for current external facts, and a project expert for a clearly owned domain.
-3. **Review and close gaps.** Check every report for evidence, omissions, contradictions, and research gaps. Send focused follow-ups to warm agents when useful; prefer a fresh agent after two substantial follow-ups, exceptionally three.
-4. **Route mutations.** Send authored changes to `code-developer`; send exact old-to-new replacements or exact file contents to `bulk-editor`. The main thread never mutates repository files while this skill is active, including deletions.
-5. **Verify and synthesize.** Independently inspect the diff and run the narrowest relevant checks. Reconcile reports into decisions; never concatenate agent summaries as the answer.
-6. **Run an independent gate.** For any repository delta, use a fresh read-only reviewer, normally `deep-analyst`, for a defect pass. Add an adversarial pass when the change embodies a design or security decision. Present findings with your own judgment and obtain the user's decision before fixes.
-7. **Audit guidance staleness.** Compare the landed delta with affected `.agents/skills/**`, nested `AGENTS.md`, `.codex/agents/**`, and `.codex/agent-memory/**`. Follow `references/skill-staleness-audit.md`; apply exact documentation specs through `bulk-editor`.
-8. **Capture durable lessons.** Follow `references/rule-capture.md`. Put stable, subtree-specific guidance in the closest nested `AGENTS.md`; propose root-wide changes instead of silently editing the root guidance.
+Copy its steps into the plan, and mark any step you skip `skip: <reason>`. A change to one or two files with no design decision takes the Direct route: do it, verify it on the right surface, and report. [Principles](references/principles.md) lists the triggers that change a decision.
 
-Record each step as `done`, `n/a - zero repository changes`, or `user-waived: <quoted decision>` in `.codex/run-ledgers/`. A step is never skipped merely because it appears unnecessary.
+## Start with scope
 
-## Mutation and permission rules
+1. Read `AGENTS.md`, check the current branch (your project's branch notes, if any), and preserve unrelated work already in the tree.
+2. Identify the smallest useful work streams. Give each stream one concrete question or one owned edit surface.
+3. Read the project skills that apply from `.agents/skills/<skill>/SKILL.md`. Tell a subagent which skills to read; skill contents are not automatically injected into custom agents.
+4. Read relevant entries from `docs/agent-rules/INDEX.md` and `docs/agent-knowledge/INDEX.md` explicitly. Treat knowledge notes as leads to verify against current code.
 
-- Preserve unrelated working-tree changes. Writers receive exact target files, scope exclusions, acceptance criteria, and relevant skill or `AGENTS.md` paths.
-- Never stage, commit, push, install dependencies, apply migrations, or contact external systems unless the user has authorized that action.
-- For phased delivery, ask separately whether clean phases may be staged and committed automatically. Only an explicit yes is standing authorization; plan approval alone is not.
-- Treat an agent's report as a claim. Re-read changed regions or run a deterministic check before reporting success.
-- Respect the parent session's sandbox and live permission mode; custom-agent defaults cannot weaken a stricter parent policy and a permissive parent can override agent defaults.
+## Project routing
 
-## Detailed procedures
+Populate this table during installation. Scan the available `.agents/skills/*/SKILL.md` metadata and applicable `AGENTS.md` files, and list only guidance that materially applies to a stream. `<prj>` is the project's short prefix; see [domain expert template](references/domain-expert-template.md).
 
-- `references/agent-roster.md`: routing, model tiers, boundaries, and dispatch format.
-- `references/dispatching-code-developer.md`: writer brief, status handling, and warm-agent recovery.
-- `references/phased-execution.md`: multi-phase entry criteria, worktrees, TDD, reviews, and commits.
-- `references/cache-and-memory.md`: cache freshness and mediated memory writes.
-- `references/skill-staleness-audit.md`: post-change guidance audit.
-- `references/rule-capture.md`: durable lesson placement.
-- `references/adding-a-subagent.md` and `references/domain-expert-template.md`: extend the roster.
-- `references/subagent-best-practices.md`: Codex capability boundaries and sourced rationale.
+| When the task touches | Read first / dispatch |
+| --- | --- |
+| `<your domain A>` | `<your AGENTS.md or .agents/skills/<skill>/SKILL.md paths>`; dispatch `<prj>-<domain-a>-expert` if installed |
+| `<your domain B>` | `<your AGENTS.md or .agents/skills/<skill>/SKILL.md paths>`; otherwise use `code-digester` |
+| Cross-cutting architecture or security | Root `AGENTS.md` plus the project's architecture and security sources; use `deep-analyst` when the reasoning is hard |
+| External or current facts | `research-specialist` only; it checks `docs/agent-knowledge/research/` first |
+| Local workflow, agent sync | This skill and its references; dispatch `localworkflow-sync` |
 
-## Gotchas
+Keep this table a routing index. Do not copy whole skill descriptions or domain invariants into it.
 
-- Codex custom agents do not provide Claude-style `skills:` preloading or scoped agent-memory grants. Agent instructions must read skill and memory files explicitly; read-only memory updates are persisted through `bulk-editor`.
-- `web_search = "disabled"` and explicitly disabled effective MCP transports are the strongest native per-agent web restrictions, but hosted tools do not have a universal custom-agent allowlist. Keep the instruction boundary and validate role discovery after installation.
-- Keep writer file sets disjoint if they run concurrently. Otherwise serialize writers or isolate them in orchestrator-created worktrees.
-- A review finding never chains directly into an automatic fix.
+## Delegate deliberately
 
-## Keep in sync
+Use `collaboration.spawn_agent` only for bounded work that can proceed independently. For a profile-pinned custom agent, pass `fork_turns: "none"` with a self-contained brief, or a deliberately bounded positive `fork_turns` value when limited recent context is required. A full-history fork can inherit the parent's model and reasoning effort instead of the custom profile. Pass the matching custom `agent_type`, a unique `task_name`, and a self-contained `message`.
 
-- `.codex/agents/*.toml` and `references/agent-roster.md`
-- `references/project-routing.md` and installed project/domain skills
-- Writer output contracts and `references/dispatching-code-developer.md`
-- Steps 6-8 and their three procedure references
+The message carries the nine fields of the [brief contract](references/brief-contract.md): GOAL, SCOPE, CONTEXT, ACCEPTANCE, VERIFY, TIMEBOX, FORBIDDEN, STANDING and REPORT. STANDING is the run's standing-orders register, pasted verbatim. FORBIDDEN includes the reminder that other agents share the working tree and must preserve unrelated edits. Pilot one dispatch before fanning out three or more similar ones.
+
+When the runtime exposes a spawned task's effective model, reasoning effort, or sandbox, inspect it before reporting that profile. Otherwise record the TOML configuration and any dispatch overrides separately, and state that the effective profile is unavailable. The TOML is the configured default and behavior contract; parent or live runtime overrides can change the effective profile.
+
+Route domain-scoped reads to `<prj>-<domain>-expert` agents and `code-digester` (GPT-6 Luna / max); difficult multi-file traces to `deep-analyst` (GPT-6 Astra / high); and external or current facts to `research-specialist` (Luna / max). Use `code-developer` for general implementation (GPT-6 Sol / medium), scoped specialist writers and reviewers (Sol / high), and `bulk-editor` only for exact mechanical edits (Luna / max). Read [subagent best practices](references/subagent-best-practices.md) for the full roster policy.
+
+Do not delegate merely to satisfy a workflow shape. Avoid overlapping write ownership. With limited concurrency, keep a slot available when review or follow-up work is likely.
+
+After dispatch:
+
+- use `collaboration.send_message` to add information without starting an idle agent;
+- use `collaboration.followup_task` to give an existing idle agent more work and trigger a turn;
+- use `collaboration.wait_agent` with a useful timeout to await mailbox updates;
+- inspect every result and reconcile it with the current tree before acting.
+
+See [dispatching a code developer](references/dispatching-code-developer.md) for implementation briefs and [adding a subagent](references/adding-a-subagent.md) when the roster itself must change.
+
+## Implement and review
+
+Writers own only the files named in their brief. Readers may propose edits or knowledge notes, but a writer or the main thread applies them. Continue through routine fixes already authorized by the user; do not insert automatic commit, push, run-start, or approval stops. If your project has a pre-commit gate, commits go through it.
+
+After any code-changing wave:
+
+1. Inspect the delta and run proportionate checks (`<your typecheck>`, `<your lint>`, `<your unit tests>`, targeted tests).
+2. Dispatch `code-reviewer` for an independent defect review.
+3. Also dispatch `adversarial-reviewer` when the change includes a material design or approach choice, a schema change, a security-sensitive path, or a concurrency or caching boundary, or when the user asks to challenge the approach.
+4. Triage the findings into Act on, Consider, Noted or Dismissed, record who raised each one, and fix the confirmed issues that fall within the authorized scope.
+5. Bind each verdict to the tree it saw: HEAD, the diff hash and the untracked files. A later edit voids the verdict, so rerun the affected checks and the review as needed.
+
+Dispatch profile-pinned reviewers with `fork_turns: "none"` and a self-contained brief. If filesystem-enforced independence is required, start them from a read-only parent or runtime. Verify the effective child sandbox when the runtime exposes it; otherwise report that enforcement could not be independently observed. Reviewer TOMLs alone do not prove enforcement under a broader live override.
+
+Read [review gate](references/review-gate.md) for the brief and disposition contract. For staged work, use the multi-phase playbook in [playbooks](references/playbooks.md); phases organize risk and evidence but do not imply automatic commits.
+
+## Keep project guidance current
+
+After implementation, audit the touched domain skills and explicitly loaded rules for stale claims. Use the owning `<prj>-<domain>-expert` for a single domain or `skill-auditor` for cross-domain changes. Apply confirmed docs updates in the same authorized task. Read [skill staleness audit](references/skill-staleness-audit.md).
+
+Record reusable, project-specific knowledge in the curated indexes:
+
+- `docs/agent-knowledge/INDEX.md` routes evidence-backed shared notes.
+- `docs/agent-rules/INDEX.md` routes rules that agents must explicitly load.
+
+Readers propose notes; the main thread or an assigned writer applies them. Do not create hidden memory injection or claim that these files load automatically. Read [rule capture](references/rule-capture.md) for the bar and [domain expert template](references/domain-expert-template.md) for domain ownership.
+
+## Finish
+
+Put the outcome first. Then report:
+- the files changed;
+- the checks run, each with an evidence label (`ran`, `read`, `inferred` or `unknown`) and each change's verification level;
+- the review dispositions, with who raised each one, and the dismissed findings with the filter that dismissed them;
+- what was not verified, and why;
+- every dispatched agent and its outcome;
+- residual risks and any intentionally deferred work.
+
+Don't claim verification you didn't perform. Write in plain sentences.
